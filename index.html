@@ -448,6 +448,7 @@ let period = '30';
 let viewMode = 'cum';
 let sortKey = 'views', sortDir = -1;
 let liveStat = null;        // C옵션 실시간 값 {id, views}
+let dataSource = 'local';   // 'sheet' | 'embedded' | 'local' — 헤더 표시용
 
 function colorOf(id) {
   const i = selectedIds.indexOf(id);
@@ -741,16 +742,24 @@ async function loadData() {
   // B옵션: 시트 URL이 있으면 우선 시도, 실패 시 로컬로 폴백
   if (CFG.SHEET_CSV_URL) {
     try {
-      const r = await fetch(CFG.SHEET_CSV_URL);
+      // 캐시 무효화: 브라우저/구글 캐시가 옛 CSV를 주지 않도록 타임스탬프 부착
+      const bust = (CFG.SHEET_CSV_URL.includes('?') ? '&' : '?') + '_ts=' + Date.now();
+      const r = await fetch(CFG.SHEET_CSV_URL + bust, { cache: 'no-store' });
       if (r.ok) {
         const d = buildFromSheetRows(parseCsv(await r.text()));
-        if (d.videos.length) { console.log('✅ 구글시트 실시간 데이터 사용 (' + d.videos.length + '개 영상)'); return d; }
+        if (d.videos.length) {
+          dataSource = 'sheet';
+          console.log('✅ 구글시트 실시간 데이터 사용 (' + d.videos.length + '개 영상)');
+          return d;
+        }
       }
+      console.warn('시트 응답이 비었거나 오류 — 로컬 데이터로 대체합니다 (HTTP ' + r.status + ')');
     } catch (e) { console.warn('시트 연동 실패 — 로컬 데이터로 대체합니다:', e.message); }
   }
-  if (window.EMBEDDED_DATA) return window.EMBEDDED_DATA; // standalone 버전
+  if (window.EMBEDDED_DATA) { dataSource = 'embedded'; return window.EMBEDDED_DATA; } // standalone 버전
   const r = await fetch('data.json');
   if (!r.ok) throw new Error('data.json 로드 실패');
+  dataSource = 'local';
   return r.json();
 }
 
@@ -761,7 +770,8 @@ function init() {
   const gen = DATA.generatedAt
     ? new Date(DATA.generatedAt).toLocaleString('sv-SE', { hour12: false }).slice(0, 16)
     : '-';
-  $('#hd-meta').textContent = `마지막 갱신 ${gen} · 데이터 기간 ${DATA.dateRange.start} ~ ${DATA.dateRange.end}`;
+  const srcLabel = { sheet: '🟢 라이브 시트', embedded: '📦 내장 스냅샷', local: '💾 로컬 파일' }[dataSource];
+  $('#hd-meta').textContent = `${srcLabel} · 갱신 ${gen} · 기간 ${DATA.dateRange.start} ~ ${DATA.dateRange.end}`;
   $('#foot').textContent = `BNM YouTube 음원 모니터링 — 링크·썸네일은 video_id 기준으로 생성됩니다. 데이터 갱신: node scripts/build-data.mjs`;
 
   renderKPIs(); renderChart(); renderTable(); renderDrill();

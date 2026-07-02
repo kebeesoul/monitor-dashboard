@@ -10,6 +10,8 @@
 //   video id 조회 시 "오늘 실시간 값"이 그래프 끝에 붙습니다.
 //   키가 없어도 아무 문제 없이 동작합니다.
 window.DASH_CONFIG = {
-  SHEET_CSV_URL: "",
+  // DailyDelta 탭을 CSV로 읽는 라이브 URL (시트가 공개돼 있어 바로 동작)
+  // 시트를 고치고 대시보드를 새로고침하면 최신 데이터가 반영됩니다.
+  SHEET_CSV_URL: "https://docs.google.com/spreadsheets/d/19pyGwBOSEm62tyOi5s0_zh8CwgrsIX89GhZ7J7EQMRs/gviz/tq?tqx=out:csv&sheet=DailyDelta",
   YT_API_KEY: ""
 };
