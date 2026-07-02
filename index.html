@@ -47,7 +47,7 @@ header {
 .hd-right { margin-left: auto; display: flex; align-items: center; gap: 8px; position: relative; }
 #id-input {
   background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25);
-  color: #fff; border-radius: 8px; padding: 6px 12px; font-size: 13px; width: 220px;
+  color: #fff; border-radius: 8px; padding: 6px 12px; font-size: 13px; width: 300px;
   font-family: var(--font);
 }
 #id-input::placeholder { color: rgba(255,255,255,0.45); }
@@ -62,6 +62,34 @@ header {
   background: #1d1d1f; color: #ffb4ab; font-size: 12px;
   padding: 6px 12px; border-radius: 8px; white-space: nowrap; display: none;
 }
+#id-msg.ok { color: #7ee2a8; }
+/* 새 곡 등록 패널 (URL이 미등록 영상일 때) */
+#register {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 40;
+  background: #1d1d1f; color: #fff; border-radius: 10px; padding: 14px;
+  width: 320px; display: none; box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+}
+#register h3 { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+#register .r-sub { font-size: 11px; color: rgba(255,255,255,0.55); margin-bottom: 10px; }
+#register label { display: block; font-size: 11px; color: rgba(255,255,255,0.6); margin: 8px 0 3px; }
+#register input {
+  width: 100%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+  color: #fff; border-radius: 6px; padding: 6px 9px; font-size: 13px; font-family: var(--font);
+}
+#register input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+#register input[readonly] { color: rgba(255,255,255,0.55); background: rgba(255,255,255,0.05); }
+#register .r-actions { display: flex; gap: 8px; margin-top: 12px; }
+#register .r-actions button {
+  flex: 1; border: none; border-radius: 7px; padding: 7px; font-size: 12px;
+  cursor: pointer; font-family: var(--font);
+}
+#reg-submit { background: var(--accent); color: #fff; }
+#reg-submit:hover { filter: brightness(1.1); }
+#reg-submit:disabled { opacity: 0.5; cursor: default; }
+#reg-cancel { background: rgba(255,255,255,0.14); color: #fff; }
+#reg-status { font-size: 11px; margin-top: 8px; min-height: 14px; }
+#reg-status.err { color: #ffb4ab; } #reg-status.ok { color: #7ee2a8; }
+#reg-status.info { color: rgba(255,255,255,0.6); }
 
 /* ── KPI ── */
 .kpi-row {
@@ -177,9 +205,24 @@ footer { margin-top: 14px; font-size: 11px; color: var(--ink-3); text-align: cen
       <div class="hd-meta" id="hd-meta">데이터 로딩 중…</div>
     </div>
     <div class="hd-right">
-      <input id="id-input" type="text" placeholder="video id 입력 (예: _89SAQOjCEE)" spellcheck="false">
+      <input id="id-input" type="text" placeholder="유튜브 URL 붙여넣기 (조회 / 새 곡 등록)" spellcheck="false">
       <button id="id-btn">조회</button>
       <div id="id-msg"></div>
+      <div id="register">
+        <h3>새 곡 등록</h3>
+        <div class="r-sub">이 영상은 아직 추적 목록에 없습니다. 시트에 추가합니다.</div>
+        <label>video id</label>
+        <input id="reg-id" type="text" readonly>
+        <label>아티스트명</label>
+        <input id="reg-artist" type="text" placeholder="예: 브라운아이드소울" spellcheck="false">
+        <label>곡명</label>
+        <input id="reg-title" type="text" placeholder="예: 비가와" spellcheck="false">
+        <div class="r-actions">
+          <button id="reg-cancel">취소</button>
+          <button id="reg-submit">시트에 등록</button>
+        </div>
+        <div id="reg-status"></div>
+      </div>
     </div>
   </div>
 </header>
@@ -641,19 +684,36 @@ function renderDrill() {
   }
 }
 
-/* ═══════════════ video id 조회 ═══════════════ */
-function showIdMsg(text) {
+/* ═══════════════ 유튜브 URL → id 조회 / 새 곡 등록 ═══════════════ */
+// 지원 형태: youtu.be/ID, watch?v=ID, music.youtube.com, /shorts/ID, /embed/ID, &list=…, 순수 11자 id
+function extractVideoId(input) {
+  const s = (input || '').trim();
+  if (!s) return null;
+  if (/^[A-Za-z0-9_-]{11}$/.test(s)) return s; // 순수 id 붙여넣기도 허용
+  let m;
+  if ((m = s.match(/[?&]v=([A-Za-z0-9_-]{11})/))) return m[1];
+  if ((m = s.match(/youtu\.be\/([A-Za-z0-9_-]{11})/))) return m[1];
+  if ((m = s.match(/\/(?:shorts|embed|live)\/([A-Za-z0-9_-]{11})/))) return m[1];
+  if ((m = s.match(/([A-Za-z0-9_-]{11})/))) return m[1]; // 마지막 폴백: 문자열 내 11자 토큰
+  return null;
+}
+
+function showIdMsg(text, ok) {
   const el = $('#id-msg');
   el.textContent = text;
+  el.className = ok ? 'ok' : '';
   el.style.display = 'block';
   clearTimeout(showIdMsg._t);
   showIdMsg._t = setTimeout(() => { el.style.display = 'none'; }, 4000);
 }
+
 async function lookupId() {
-  const id = $('#id-input').value.trim();
-  if (!id) return;
+  const raw = $('#id-input').value;
+  const id = extractVideoId(raw);
+  if (!id) { showIdMsg('유튜브 URL에서 영상 id를 찾지 못했습니다'); return; }
   const v = DATA.videos.find(x => x.id === id);
-  if (!v) { showIdMsg('해당 id의 스크랩 기록이 없습니다'); return; }
+  if (!v) { openRegister(id); return; } // 미등록 → 새 곡 등록 흐름
+  closeRegister();
   // C옵션: API 키가 있으면 실시간 값 조회 (실패해도 무시)
   liveStat = null;
   if (CFG.YT_API_KEY) {
@@ -667,6 +727,88 @@ async function lookupId() {
     } catch (e) { /* 실시간 조회 실패 — 로컬 데이터로 계속 */ }
   }
   setHighlight(id, true);
+}
+
+/* ── 새 곡 등록 패널 ── */
+function closeRegister() { $('#register').style.display = 'none'; }
+async function openRegister(id) {
+  $('#reg-id').value = id;
+  $('#reg-artist').value = '';
+  $('#reg-title').value = '';
+  const st = $('#reg-status');
+  $('#register').style.display = 'block';
+  // 자동 추정: YT API 키가 있으면 제목·채널명을 가져와 칸을 미리 채움 (수정 가능)
+  if (CFG.YT_API_KEY) {
+    st.className = 'info'; st.textContent = '유튜브에서 제목·채널 불러오는 중…';
+    try {
+      const r = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${encodeURIComponent(id)}&key=${encodeURIComponent(CFG.YT_API_KEY)}`);
+      const j = await r.json();
+      const sn = j.items && j.items[0] && j.items[0].snippet;
+      if (sn) {
+        $('#reg-artist').value = (sn.channelTitle || '').replace(/\s*-\s*Topic$/i, '').trim();
+        $('#reg-title').value = (sn.title || '').trim();
+        st.className = 'info'; st.textContent = '자동 채움 완료 — 확인·수정 후 등록하세요';
+      } else {
+        st.className = 'err'; st.textContent = '유튜브에서 정보를 못 찾음 — 직접 입력하세요';
+      }
+    } catch (e) {
+      st.className = 'err'; st.textContent = '자동 조회 실패 — 직접 입력하세요';
+    }
+  } else {
+    st.className = 'info'; st.textContent = '아티스트·곡명을 입력한 뒤 등록하세요';
+  }
+  $('#reg-artist').focus();
+}
+
+async function submitRegister() {
+  const payload = {
+    video_id: $('#reg-id').value.trim(),
+    artist: $('#reg-artist').value.trim(),
+    title: $('#reg-title').value.trim(),
+    youtube_url: `https://www.youtube.com/watch?v=${$('#reg-id').value.trim()}`,
+  };
+  const st = $('#reg-status');
+  if (!payload.artist || !payload.title) { st.className = 'err'; st.textContent = '아티스트명과 곡명을 모두 입력하세요'; return; }
+  if (!CFG.SHEET_WRITE_URL) {
+    st.className = 'err';
+    st.textContent = '시트 쓰기 URL(config.js의 SHEET_WRITE_URL)이 아직 설정되지 않았습니다';
+    return;
+  }
+  const btn = $('#reg-submit');
+  btn.disabled = true; st.className = 'info'; st.textContent = '시트에 등록 중…';
+  try {
+    // Apps Script 웹앱은 프리플라이트를 안 받으므로 text/plain 단순요청으로 전송
+    const r = await fetch(CFG.SHEET_WRITE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+      redirect: 'follow',
+    });
+    let res = {};
+    try { res = await r.json(); } catch (_) { res = { ok: r.ok }; }
+    if (res.ok === false && res.reason === 'duplicate') {
+      st.className = 'info'; st.textContent = '이미 시트에 등록된 영상입니다';
+    } else {
+      st.className = 'ok'; st.textContent = '✅ 시트에 등록했습니다';
+      showIdMsg('✅ ' + payload.title + ' 등록 완료', true);
+      setTimeout(closeRegister, 1200);
+    }
+  } catch (e) {
+    // CORS로 응답을 못 읽는 환경 → no-cors 재시도(전송은 성공하나 결과 확인 불가)
+    try {
+      await fetch(CFG.SHEET_WRITE_URL, {
+        method: 'POST', mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload),
+      });
+      st.className = 'ok'; st.textContent = '전송했습니다 — 시트에서 확인해 주세요';
+      setTimeout(closeRegister, 1400);
+    } catch (e2) {
+      st.className = 'err'; st.textContent = '등록 실패: ' + (e2.message || e.message);
+    }
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 /* ═══════════════ B옵션: 구글시트 CSV ═══════════════ */
@@ -795,6 +937,9 @@ function init() {
   });
   $('#id-btn').onclick = lookupId;
   $('#id-input').addEventListener('keydown', e => { if (e.key === 'Enter') lookupId(); });
+  $('#reg-cancel').onclick = closeRegister;
+  $('#reg-submit').onclick = submitRegister;
+  $('#reg-title').addEventListener('keydown', e => { if (e.key === 'Enter') submitRegister(); });
   window.addEventListener('resize', () => { renderChart(); });
 }
 

@@ -127,7 +127,7 @@ const indexPath = join(ROOT, 'index.html');
 if (existsSync(indexPath)) {
   let html = readFileSync(indexPath, 'utf8');
   const inline = `<script>
-window.DASH_CONFIG = window.DASH_CONFIG || { SHEET_CSV_URL: "", YT_API_KEY: "" };
+window.DASH_CONFIG = window.DASH_CONFIG || { SHEET_CSV_URL: "", SHEET_WRITE_URL: "", YT_API_KEY: "" };
 window.EMBEDDED_DATA = ${JSON.stringify(data)};
 <\/script>`;
   // config.js·데이터 fetch 대신 임베드 데이터를 쓰도록 마커 치환
