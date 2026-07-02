@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BNM YouTube 음원 모니터링</title>
+<style>
+:root {
+  --bg: #f5f5f7;
+  --card: #ffffff;
+  --ink: #1d1d1f;
+  --ink-2: rgba(0,0,0,0.8);
+  --ink-3: rgba(0,0,0,0.48);
+  --accent: #0071e3;
+  --link: #0066cc;
+  --up: #147a3d;
+  --down: #b3261e;
+  --radius: 12px;
+  --font: "SF Pro Text","SF Pro Display",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Malgun Gothic","Noto Sans KR","Helvetica Neue",Helvetica,Arial,sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 14px;
+  letter-spacing: -0.2px;
+  line-height: 1.47;
+}
+.wrap { max-width: 1440px; margin: 0 auto; padding: 0 20px 24px; }
+
+/* ── header ── */
+header {
+  position: sticky; top: 0; z-index: 30;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  color: #fff;
+}
+.hd-in {
+  max-width: 1440px; margin: 0 auto; padding: 10px 20px;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.hd-title { font-size: 17px; font-weight: 600; letter-spacing: -0.374px; }
+.hd-meta { font-size: 12px; color: rgba(255,255,255,0.65); letter-spacing: -0.12px; }
+.hd-right { margin-left: auto; display: flex; align-items: center; gap: 8px; position: relative; }
+#id-input {
+  background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25);
+  color: #fff; border-radius: 8px; padding: 6px 12px; font-size: 13px; width: 220px;
+  font-family: var(--font);
+}
+#id-input::placeholder { color: rgba(255,255,255,0.45); }
+#id-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+#id-btn {
+  background: var(--accent); color: #fff; border: none; border-radius: 8px;
+  padding: 6px 15px; font-size: 13px; cursor: pointer; font-family: var(--font);
+}
+#id-btn:hover { filter: brightness(1.1); }
+#id-msg {
+  position: absolute; top: calc(100% + 6px); right: 0;
+  background: #1d1d1f; color: #ffb4ab; font-size: 12px;
+  padding: 6px 12px; border-radius: 8px; white-space: nowrap; display: none;
+}
+
+/* ── KPI ── */
+.kpi-row {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 16px 0;
+}
+.kpi {
+  background: var(--card); border-radius: var(--radius); padding: 14px 16px;
+  min-width: 0;
+}
+.kpi .k-label { font-size: 12px; color: var(--ink-3); letter-spacing: -0.12px; }
+.kpi .k-value { font-size: 24px; font-weight: 600; letter-spacing: -0.28px; line-height: 1.14; margin: 3px 0 2px; word-break: keep-all; }
+.kpi .k-value.small { font-size: 16px; line-height: 1.25; }
+.kpi .k-sub { font-size: 12px; color: var(--ink-3); }
+.dir-up { color: var(--up); }
+.dir-down { color: var(--down); }
+.dir-flat { color: var(--ink-3); }
+
+/* ── main grid ── */
+.main-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 12px; align-items: stretch; }
+.panel { background: var(--card); border-radius: var(--radius); padding: 16px; min-width: 0; }
+.panel h2 { font-size: 15px; font-weight: 600; letter-spacing: -0.374px; }
+
+/* chart controls */
+.chart-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.seg { display: inline-flex; background: var(--bg); border-radius: 8px; padding: 2px; }
+.seg button {
+  border: none; background: transparent; color: var(--ink-2); font-size: 12px;
+  padding: 4px 12px; border-radius: 6px; cursor: pointer; font-family: var(--font);
+}
+.seg button.on { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+.legend { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 2px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12px;
+  background: var(--bg); border: 1px solid transparent; border-radius: 980px;
+  padding: 3px 10px; cursor: pointer; color: var(--ink-2); font-family: var(--font);
+  max-width: 220px;
+}
+.chip .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.chip .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip.off { opacity: 0.4; }
+.chip.hl { border-color: var(--accent); }
+#chart-box { position: relative; }
+#chart-box svg { display: block; width: 100%; }
+#tooltip {
+  position: absolute; pointer-events: none; display: none; z-index: 5;
+  background: rgba(29,29,31,0.92); color: #fff; border-radius: 8px;
+  padding: 8px 10px; font-size: 11px; line-height: 1.5; white-space: nowrap;
+}
+#tooltip .tt-d { color: rgba(255,255,255,0.6); margin-bottom: 2px; }
+
+/* ── drilldown ── */
+#drill { display: flex; flex-direction: column; gap: 10px; }
+#drill .d-empty { color: var(--ink-3); font-size: 13px; padding: 30px 0; text-align: center; }
+#drill img.d-thumb { width: 100%; border-radius: 8px; display: block; }
+#drill .d-title { font-size: 15px; font-weight: 600; letter-spacing: -0.374px; }
+#drill .d-title a { color: var(--link); text-decoration: none; }
+#drill .d-title a:hover { text-decoration: underline; }
+#drill .d-summary { font-size: 12.5px; color: var(--ink-2); background: var(--bg); border-radius: 8px; padding: 10px 12px; }
+#drill .d-live { font-size: 12px; color: var(--accent); }
+.mini-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+.mini-table th { text-align: right; color: var(--ink-3); font-weight: 600; padding: 3px 6px; border-bottom: 1px solid var(--bg); }
+.mini-table th:first-child, .mini-table td:first-child { text-align: left; }
+.mini-table td { text-align: right; padding: 3px 6px; border-bottom: 1px solid var(--bg); font-variant-numeric: tabular-nums; }
+
+/* ── table ── */
+.tbl-panel { margin-top: 12px; }
+.tbl-scroll { max-height: 340px; overflow-y: auto; border-radius: 8px; }
+table.perf { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.perf thead th {
+  position: sticky; top: 0; z-index: 2; background: var(--card);
+  text-align: right; font-size: 12px; color: var(--ink-3); font-weight: 600;
+  padding: 8px 10px; border-bottom: 1px solid #e8e8ed; cursor: pointer; white-space: nowrap;
+  user-select: none;
+}
+table.perf thead th.left { text-align: left; }
+table.perf thead th .arr { font-size: 10px; color: var(--accent); }
+table.perf tbody td { padding: 6px 10px; border-bottom: 1px solid #f0f0f2; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.perf tbody td.left { text-align: left; }
+table.perf tbody tr { cursor: pointer; }
+table.perf tbody tr:hover { background: #fafafc; }
+table.perf tbody tr.sel { background: #eef5fd; }
+.t-thumb { width: 64px; height: 36px; object-fit: cover; border-radius: 5px; display: block; background: #e8e8ed; }
+.t-title { max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
+.badge {
+  display: inline-block; font-size: 10.5px; font-weight: 600; border-radius: 980px;
+  padding: 1px 8px; margin-left: 4px; letter-spacing: 0;
+}
+.b-accel { background: #fdeeea; color: #c2410c; }
+.b-decel { background: #eef0f3; color: #475569; }
+.b-stall { background: #f1f1f4; color: #6b7280; }
+.b-spike { background: #fdf3d7; color: #92600a; }
+.b-new   { background: #e7f1fc; color: #0b5cad; }
+.spark path { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+.spark { display: block; }
+
+footer { margin-top: 14px; font-size: 11px; color: var(--ink-3); text-align: center; }
+
+@media (max-width: 1024px) {
+  .main-grid { grid-template-columns: 1fr; }
+  .kpi-row { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .kpi-row { grid-template-columns: 1fr; }
+  #id-input { width: 140px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="hd-in">
+    <div>
+      <div class="hd-title">BNM YouTube 음원 모니터링</div>
+      <div class="hd-meta" id="hd-meta">데이터 로딩 중…</div>
+    </div>
+    <div class="hd-right">
+      <input id="id-input" type="text" placeholder="video id 입력 (예: _89SAQOjCEE)" spellcheck="false">
+      <button id="id-btn">조회</button>
+      <div id="id-msg"></div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="kpi-row" id="kpi-row"></div>
+
+  <div class="main-grid">
+    <div class="panel">
+      <div class="chart-head">
+        <h2>조회수 추세</h2>
+        <div class="seg" id="seg-period">
+          <button data-p="7">7일</button>
+          <button data-p="30" class="on">30일</button>
+          <button data-p="all">전체</button>
+        </div>
+        <div class="seg" id="seg-view">
+          <button data-v="cum" class="on">누적 조회수</button>
+          <button data-v="delta">일일 증가분</button>
+        </div>
+        <div class="seg" id="seg-num">
+          <button data-n="abbr" class="on">축약 (66.4M)</button>
+          <button data-n="full">전체 자리수</button>
+        </div>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div id="chart-box">
+        <svg id="chart" height="360"></svg>
+        <div id="tooltip"></div>
+      </div>
+    </div>
+
+    <div class="panel" id="drill">
+      <div class="d-empty">영상을 선택하면 상세 분석이 표시됩니다.<br>(테이블 행 클릭 또는 상단 video id 조회)</div>
+    </div>
+  </div>
+
+  <div class="panel tbl-panel">
+    <h2 style="margin-bottom:8px">영상별 성과 <span style="font-weight:400;color:var(--ink-3);font-size:12px" id="tbl-count"></span></h2>
+    <div class="tbl-scroll">
+      <table class="perf">
+        <thead>
+          <tr>
+            <th class="left" style="cursor:default"></th>
+            <th class="left" data-sort="title">제목</th>
+            <th data-sort="views">현재 조회수</th>
+            <th data-sort="d7">최근 7일 증가</th>
+            <th data-sort="rate">최근 증가율</th>
+            <th style="cursor:default">추세 (30일)</th>
+            <th data-sort="points">포인트</th>
+            <th class="left" style="cursor:default">상태</th>
+          </tr>
+        </thead>
+        <tbody id="tbl-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer id="foot"></footer>
+</div>
+
+<script src="config.js"></script>
+<script>
+'use strict';
+/* ═══════════════ 유틸 ═══════════════ */
+const $ = s => document.querySelector(s);
+const CFG = window.DASH_CONFIG || { SHEET_CSV_URL: '', YT_API_KEY: '' };
+const PALETTE = ['#0071e3','#d97706','#059669','#dc2626','#7c3aed','#0891b2','#be185d','#4d7c0f','#b45309','#475569'];
+
+let numMode = 'abbr'; // 'abbr' | 'full'
+function fmtFull(n) { return Math.round(n).toLocaleString('ko-KR'); }
+function fmtAbbr(n) {
+  const a = Math.abs(n), s = n < 0 ? '-' : '';
+  if (a >= 1e8) return s + (a/1e8).toFixed(1) + '억';
+  if (a >= 1e6) return s + (a/1e6).toFixed(1) + 'M';
+  if (a >= 1e3) return s + (a/1e3).toFixed(1) + 'K';
+  return s + Math.round(a);
+}
+function fmt(n) { return numMode === 'abbr' ? fmtAbbr(n) : fmtFull(n); }
+function sign(n) { return n > 0 ? '+' : ''; }
+function dirHtml(pct, invert) {
+  if (!isFinite(pct) || Math.abs(pct) < 0.05) return '<span class="dir-flat">— 0%</span>';
+  const up = pct > 0;
+  const cls = up ? 'dir-up' : 'dir-down';
+  const arrow = up ? '▲' : '▼';
+  return `<span class="${cls}">${arrow} ${Math.abs(pct).toFixed(1)}%</span>`;
+}
+function dayDiff(a, b) { return Math.round((new Date(b) - new Date(a)) / 86400000); }
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ═══════════════ 파생 지표 (§6) ═══════════════ */
+function windowSum(hist, endDate, days) {
+  // endDate 기준 최근 days일(포함) 안의 delta 합 — 날짜 기반이라 불규칙 스크랩에도 안전
+  const from = new Date(new Date(endDate) - (days - 1) * 86400000).toISOString().slice(0,10);
+  let sum = 0;
+  for (const p of hist) if (p.date >= from && p.date <= endDate) sum += p.delta;
+  return sum;
+}
+function median(arr) {
+  if (!arr.length) return 0;
+  const s = [...arr].sort((a,b)=>a-b);
+  const m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2;
+}
+function computeMetrics(v, globalEnd) {
+  const h = v.history;
+  const n = h.length;
+  const end = h[n-1].date;
+  const spanDays = Math.max(1, dayDiff(h[0].date, end));
+  const totalGain = h[n-1].views - h[0].views;
+  const overallDaily = totalGain / spanDays;
+
+  const d7 = windowSum(h, end, 7);
+  const prev7End = new Date(new Date(end) - 7 * 86400000).toISOString().slice(0,10);
+  const d7prev = windowSum(h, prev7End, 7);
+  const d30 = windowSum(h, end, 30);
+  const lastRate = h[n-1].rate;
+
+  // 스파이크: delta가 중앙값의 2배 이상 (중앙값>0일 때만)
+  const deltas = h.slice(1).map(p => p.delta);
+  const med = median(deltas);
+  let spikeDate = null;
+  if (med > 0) {
+    for (let i = h.length - 1; i >= 1; i--) {
+      if (h[i].delta >= med * 2 && h[i].delta > 0) { spikeDate = h[i].date; break; }
+    }
+  }
+
+  const badges = [];
+  if (n < 30) {
+    badges.push({ cls:'b-new', label:'신규', tip:'데이터 30개 미만 — 추세 판단 보류' });
+  } else {
+    if (d7prev > 0 && d7 >= d7prev * 1.2) badges.push({ cls:'b-accel', label:'가속🔥', tip:'최근 7일이 직전 7일보다 20%↑' });
+    else if (d7prev > 0 && d7 <= d7prev * 0.8) badges.push({ cls:'b-decel', label:'감속', tip:'최근 7일이 직전 7일보다 20%↓' });
+    if (overallDaily > 0 && (d7 / 7) < overallDaily * 0.3) badges.push({ cls:'b-stall', label:'정체', tip:'최근 7일 증가폭이 전체 평균의 30% 미만' });
+  }
+  if (spikeDate) badges.push({ cls:'b-spike', label:'스파이크', tip:'평소(중앙값)의 2배 이상 급등: ' + spikeDate, date: spikeDate });
+
+  return { d7, d7prev, d30, overallDaily, lastRate, badges, spikeDate, points: n, end };
+}
+
+/* ═══════════════ SVG 차트 렌더러 ═══════════════ */
+function renderLineChart(svg, series, opts) {
+  // series: [{id, name, color, points:[{date, value}]}]
+  const W = svg.clientWidth || 800, H = +svg.getAttribute('height') || 360;
+  const padL = 56, padR = 14, padT = 14, padB = 28;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = '';
+  const allDates = [...new Set(series.flatMap(s => s.points.map(p => p.date)))].sort();
+  if (!allDates.length) {
+    svg.innerHTML = `<text x="${W/2}" y="${H/2}" text-anchor="middle" fill="rgba(0,0,0,0.4)" font-size="13">표시할 데이터가 없습니다</text>`;
+    return null;
+  }
+  const t0 = +new Date(allDates[0]), t1 = +new Date(allDates[allDates.length-1]);
+  const tSpan = Math.max(1, t1 - t0);
+  let vMin = Infinity, vMax = -Infinity;
+  for (const s of series) for (const p of s.points) { if (p.value < vMin) vMin = p.value; if (p.value > vMax) vMax = p.value; }
+  if (!isFinite(vMin)) { vMin = 0; vMax = 1; }
+  if (vMin === vMax) { vMin -= 1; vMax += 1; }
+  if (opts.zeroBase && vMin > 0) vMin = 0;
+  const rawMin = vMin;
+  const pad = (vMax - vMin) * 0.06;
+  vMin -= pad; vMax += pad;
+  if (rawMin >= 0 && vMin < 0) vMin = 0; // 조회수는 음수 없음 — 패딩이 0 아래로 내려가지 않게
+
+  const X = d => padL + ((+new Date(d)) - t0) / tSpan * (W - padL - padR);
+  const Y = v => padT + (1 - (v - vMin) / (vMax - vMin)) * (H - padT - padB);
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+
+  // y grid (5 lines)
+  for (let i = 0; i <= 4; i++) {
+    const v = vMin + (vMax - vMin) * i / 4;
+    const y = Y(v);
+    svg.appendChild(el('line', { x1: padL, x2: W - padR, y1: y, y2: y, stroke: '#ececf0', 'stroke-width': 1 }));
+    const t = el('text', { x: padL - 8, y: y + 4, 'text-anchor': 'end', 'font-size': 10.5, fill: 'rgba(0,0,0,0.45)' });
+    t.textContent = fmtAbbr(v);
+    svg.appendChild(t);
+  }
+  // zero line for delta view
+  if (vMin < 0 && vMax > 0) {
+    svg.appendChild(el('line', { x1: padL, x2: W - padR, y1: Y(0), y2: Y(0), stroke: '#c9c9ce', 'stroke-width': 1, 'stroke-dasharray': '3 3' }));
+  }
+  // x ticks (~6)
+  const step = Math.max(1, Math.ceil(allDates.length / 6));
+  for (let i = 0; i < allDates.length; i += step) {
+    const d = allDates[i];
+    const t = el('text', { x: X(d), y: H - 8, 'text-anchor': 'middle', 'font-size': 10.5, fill: 'rgba(0,0,0,0.45)' });
+    t.textContent = d.slice(5);
+    svg.appendChild(t);
+  }
+  // lines
+  for (const s of series) {
+    if (!s.points.length) continue;
+    const dAttr = s.points.map((p, i) => `${i ? 'L' : 'M'}${X(p.date).toFixed(1)},${Y(p.value).toFixed(1)}`).join('');
+    const isHl = opts.highlight && s.id === opts.highlight;
+    const dim = opts.highlight && !isHl;
+    svg.appendChild(el('path', {
+      d: dAttr, fill: 'none', stroke: s.color,
+      'stroke-width': isHl ? 3 : 1.8,
+      opacity: dim ? 0.25 : 1,
+      'stroke-linejoin': 'round', 'stroke-linecap': 'round'
+    }));
+    if (s.points.length === 1) {
+      const p = s.points[0];
+      svg.appendChild(el('circle', { cx: X(p.date), cy: Y(p.value), r: 3.5, fill: s.color }));
+    }
+  }
+  return { X, Y, allDates, W, H, padL, padR };
+}
+
+function attachTooltip(box, svg, series, geo, valueLabel) {
+  const tip = $('#tooltip');
+  if (!geo) { svg.onmousemove = null; return; }
+  const NS = 'http://www.w3.org/2000/svg';
+  let cursor = null;
+  svg.onmousemove = e => {
+    const r = svg.getBoundingClientRect();
+    const mx = (e.clientX - r.left) * (geo.W / r.width);
+    // nearest date
+    let best = null, bd = Infinity;
+    for (const d of geo.allDates) { const dx = Math.abs(geo.X(d) - mx); if (dx < bd) { bd = dx; best = d; } }
+    if (!best) return;
+    if (!cursor) {
+      cursor = document.createElementNS(NS, 'line');
+      cursor.setAttribute('stroke', 'rgba(0,0,0,0.25)');
+      cursor.setAttribute('stroke-width', '1');
+      svg.appendChild(cursor);
+    }
+    cursor.setAttribute('x1', geo.X(best)); cursor.setAttribute('x2', geo.X(best));
+    cursor.setAttribute('y1', 10); cursor.setAttribute('y2', geo.H - 26);
+    let html = `<div class="tt-d">${best}</div>`;
+    for (const s of series) {
+      const p = s.points.find(q => q.date === best);
+      if (p) html += `<div><span style="color:${s.color}">●</span> ${esc(s.name.slice(0,18))} <b>${fmtFull(p.value)}</b></div>`;
+    }
+    tip.innerHTML = html;
+    tip.style.display = 'block';
+    const bx = box.getBoundingClientRect();
+    let lx = e.clientX - bx.left + 14;
+    if (lx + tip.offsetWidth > bx.width) lx = lx - tip.offsetWidth - 24;
+    tip.style.left = lx + 'px';
+    tip.style.top = Math.max(0, e.clientY - bx.top - 20) + 'px';
+  };
+  svg.onmouseleave = () => { tip.style.display = 'none'; if (cursor) { cursor.remove(); cursor = null; } };
+}
+
+function sparkline(hist, w, h) {
+  const pts = hist.slice(-30);
+  if (pts.length < 2) return `<svg class="spark" width="${w}" height="${h}"><circle cx="${w/2}" cy="${h/2}" r="2" fill="var(--accent)"/></svg>`;
+  let mn = Infinity, mx = -Infinity;
+  for (const p of pts) { mn = Math.min(mn, p.views); mx = Math.max(mx, p.views); }
+  if (mn === mx) mx = mn + 1;
+  const d = pts.map((p, i) =>
+    `${i ? 'L' : 'M'}${(i/(pts.length-1)*(w-4)+2).toFixed(1)},${((1-(p.views-mn)/(mx-mn))*(h-6)+3).toFixed(1)}`
+  ).join('');
+  return `<svg class="spark" width="${w}" height="${h}"><path d="${d}"/></svg>`;
+}
+
+/* ═══════════════ 상태 ═══════════════ */
+let DATA = null;
+let METRICS = new Map();
+let selectedIds = [];       // 차트에 표시 중인 영상들
+let highlightId = null;     // 하이라이트/드릴다운 대상
+let period = '30';
+let viewMode = 'cum';
+let sortKey = 'views', sortDir = -1;
+let liveStat = null;        // C옵션 실시간 값 {id, views}
+
+function colorOf(id) {
+  const i = selectedIds.indexOf(id);
+  return PALETTE[(i >= 0 ? i : 0) % PALETTE.length];
+}
+
+/* ═══════════════ 렌더 ═══════════════ */
+function renderKPIs() {
+  const vs = DATA.videos;
+  const end = DATA.dateRange.end;
+  const totalViews = vs.reduce((a, v) => a + v.currentViews, 0);
+  const startViews = vs.reduce((a, v) => a + v.history[0].views, 0);
+  const totalGainPct = startViews > 0 ? (totalViews - startViews) / startViews * 100 : 0;
+
+  let d7all = 0, d7prevAll = 0;
+  for (const v of vs) { const m = METRICS.get(v.id); d7all += m.d7; d7prevAll += m.d7prev; }
+  const d7pct = d7prevAll > 0 ? (d7all - d7prevAll) / d7prevAll * 100 : 0;
+
+  let top = null;
+  for (const v of vs) { const m = METRICS.get(v.id); if (!top || m.d7 > METRICS.get(top.id).d7) top = v; }
+  const topM = METRICS.get(top.id);
+  const topPct = topM.d7prev > 0 ? (topM.d7 - topM.d7prev) / topM.d7prev * 100 : 0;
+  const newCount = vs.filter(v => v.history.length < 30).length;
+
+  $('#kpi-row').innerHTML = `
+    <div class="kpi"><div class="k-label">추적 영상 수</div>
+      <div class="k-value">${vs.length}</div>
+      <div class="k-sub">신규 편입 ${newCount}개 포함</div></div>
+    <div class="kpi"><div class="k-label">총 누적 조회수</div>
+      <div class="k-value">${fmt(totalViews)}</div>
+      <div class="k-sub">${dirHtml(totalGainPct)} 추적 시작 대비</div></div>
+    <div class="kpi"><div class="k-label">최근 7일 총 증가량</div>
+      <div class="k-value">+${fmt(d7all)}</div>
+      <div class="k-sub">${dirHtml(d7pct)} 직전 7일 대비</div></div>
+    <div class="kpi"><div class="k-label">최고 성장 영상 (7일)</div>
+      <div class="k-value small" title="${esc(top.title)}">${esc(top.title.length > 22 ? top.title.slice(0,22) + '…' : top.title)}</div>
+      <div class="k-sub">+${fmt(topM.d7)} · ${dirHtml(topPct)}</div></div>
+    <div class="kpi"><div class="k-label">최신 스크랩 날짜</div>
+      <div class="k-value small">${end}</div>
+      <div class="k-sub">데이터 ${DATA.videos.reduce((a,v)=>a+v.history.length,0).toLocaleString()}포인트</div></div>`;
+}
+
+function periodStart() {
+  if (period === 'all') return DATA.dateRange.start;
+  const days = +period;
+  return new Date(new Date(DATA.dateRange.end) - (days - 1) * 86400000).toISOString().slice(0,10);
+}
+
+function renderChart() {
+  const from = periodStart();
+  const series = selectedIds.map((id, i) => {
+    const v = DATA.videos.find(x => x.id === id);
+    if (!v) return null;
+    let pts = v.history.filter(p => p.date >= from);
+    if (viewMode === 'delta') pts = pts.map(p => ({ date: p.date, value: p.delta }));
+    else pts = pts.map(p => ({ date: p.date, value: p.views }));
+    // C옵션 실시간 값: 누적 뷰에만 임시 포인트로 덧붙임
+    if (liveStat && liveStat.id === id && viewMode === 'cum') {
+      const today = new Date().toISOString().slice(0,10);
+      if (!pts.length || pts[pts.length-1].date < today) pts = [...pts, { date: today, value: liveStat.views }];
+    }
+    return { id, name: v.title, color: PALETTE[i % PALETTE.length], points: pts };
+  }).filter(Boolean);
+
+  const svg = $('#chart');
+  $('#tooltip').style.display = 'none'; // 이전 호버 툴팁 제거
+  const geo = renderLineChart(svg, series, { highlight: highlightId, zeroBase: viewMode === 'delta' });
+  attachTooltip($('#chart-box'), svg, series, geo);
+
+  // legend chips
+  $('#legend').innerHTML = series.map(s =>
+    `<button class="chip${s.id === highlightId ? ' hl' : ''}" data-id="${s.id}" title="${esc(s.name)} — 클릭: 하이라이트, ✕: 차트에서 제거">
+      <span class="dot" style="background:${s.color}"></span><span class="nm">${esc(s.name)}</span>
+      <span class="x" data-x="${s.id}" style="color:var(--ink-3)">✕</span>
+    </button>`).join('');
+  $('#legend').querySelectorAll('.chip').forEach(ch => {
+    ch.onclick = e => {
+      const id = ch.dataset.id;
+      if (e.target.dataset.x) { toggleSeries(id); return; }
+      setHighlight(highlightId === id ? null : id, false);
+    };
+  });
+}
+
+function toggleSeries(id) {
+  const i = selectedIds.indexOf(id);
+  if (i >= 0) {
+    selectedIds.splice(i, 1);
+    if (highlightId === id) highlightId = null;
+  } else {
+    selectedIds.push(id);
+  }
+  renderChart(); renderTable();
+}
+
+function badgeHtml(m) {
+  return m.badges.map(b => `<span class="badge ${b.cls}" title="${esc(b.tip)}">${b.label}</span>`).join('');
+}
+
+function tableRows() {
+  const rows = DATA.videos.map(v => {
+    const m = METRICS.get(v.id);
+    return { v, m, title: v.title, views: v.currentViews, d7: m.d7, rate: m.lastRate, points: m.points };
+  });
+  rows.sort((a, b) => {
+    const x = a[sortKey], y = b[sortKey];
+    if (typeof x === 'string') return sortDir * x.localeCompare(y, 'ko');
+    return sortDir * (x - y);
+  });
+  return rows;
+}
+
+function renderTable() {
+  const rows = tableRows();
+  $('#tbl-count').textContent = `총 ${rows.length}개 · 행 클릭 시 차트 하이라이트 + 상세`;
+  $('#tbl-body').innerHTML = rows.map(({ v, m }) => `
+    <tr data-id="${v.id}" class="${v.id === highlightId ? 'sel' : ''}">
+      <td class="left"><img class="t-thumb" src="${v.thumb}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"></td>
+      <td class="left"><div class="t-title" title="${esc(v.title)}">${esc(v.title)}</div></td>
+      <td>${fmt(v.currentViews)}</td>
+      <td class="${m.d7 >= 0 ? '' : 'dir-down'}">${sign(m.d7)}${fmt(m.d7)}</td>
+      <td>${m.lastRate >= 0 ? '' : '-'}${Math.abs(m.lastRate).toFixed(2)}%</td>
+      <td>${sparkline(v.history, 90, 26)}</td>
+      <td>${m.points}</td>
+      <td class="left">${badgeHtml(m) || '<span style="color:var(--ink-3)">—</span>'}</td>
+    </tr>`).join('');
+  $('#tbl-body').querySelectorAll('tr').forEach(tr => {
+    tr.onclick = () => setHighlight(tr.dataset.id, true);
+  });
+  // sort indicators
+  document.querySelectorAll('th[data-sort]').forEach(th => {
+    const base = th.textContent.replace(/[▲▼]\s*$/, '').trim();
+    th.innerHTML = base + (th.dataset.sort === sortKey ? ` <span class="arr">${sortDir < 0 ? '▼' : '▲'}</span>` : '');
+  });
+}
+
+function setHighlight(id, addToChart) {
+  highlightId = id;
+  if (id && addToChart && !selectedIds.includes(id)) selectedIds.push(id);
+  renderChart(); renderTable(); renderDrill();
+}
+
+function growthSummary(v, m) {
+  const parts = [];
+  if (m.d30 !== 0) parts.push(`지난 30일 ${sign(m.d30)}${fmtAbbr(m.d30)}`);
+  const recent7Daily = m.d7 / 7;
+  parts.push(`일평균 ${sign(Math.round(recent7Daily))}${fmtFull(Math.round(recent7Daily))} (최근 7일 기준)`);
+  if (v.history.length >= 30) {
+    if (m.d7prev > 0 && m.d7 >= m.d7prev * 1.2) parts.push('최근 7일 가속 중 🔥');
+    else if (m.d7prev > 0 && m.d7 <= m.d7prev * 0.8) parts.push('최근 7일 감속');
+    else parts.push('추세 유지');
+  } else {
+    parts.push('신규 편입 — 추세 판단 보류');
+  }
+  if (m.spikeDate) parts.push(`${m.spikeDate} 스파이크 감지`);
+  return parts.join(' / ');
+}
+
+function renderDrill() {
+  const box = $('#drill');
+  if (!highlightId) {
+    box.innerHTML = '<div class="d-empty">영상을 선택하면 상세 분석이 표시됩니다.<br>(테이블 행 클릭 또는 상단 video id 조회)</div>';
+    return;
+  }
+  const v = DATA.videos.find(x => x.id === highlightId);
+  if (!v) return;
+  const m = METRICS.get(v.id);
+  const recent = v.history.slice(-14).reverse();
+  const single = v.history.length < 2;
+  box.innerHTML = `
+    <a href="${v.url}" target="_blank" rel="noopener" title="유튜브에서 열기">
+      <img class="d-thumb" src="${v.thumb}" alt="${esc(v.title)}" onerror="this.style.display='none'"></a>
+    <div class="d-title"><a href="${v.url}" target="_blank" rel="noopener">${esc(v.title)} ↗</a>
+      ${badgeHtml(m)}</div>
+    <div style="font-size:13px">현재 <b>${fmtFull(v.currentViews)}</b>회
+      ${liveStat && liveStat.id === v.id ? `<span class="d-live"> · 실시간 ${fmtFull(liveStat.views)}회 (YouTube API)</span>` : ''}</div>
+    ${single
+      ? '<div class="d-summary">데이터 포인트가 1개뿐이라 추세를 계산할 수 없습니다. (신규)</div>'
+      : `<div class="d-summary">${esc(growthSummary(v, m))}</div>
+         <svg id="drill-chart" height="140" style="width:100%"></svg>`}
+    <div style="font-size:12px;font-weight:600;color:var(--ink-3)">최근 14일</div>
+    <div style="max-height:170px;overflow-y:auto">
+    <table class="mini-table"><thead><tr><th>날짜</th><th>조회수</th><th>증가</th><th>증가율</th></tr></thead>
+    <tbody>${recent.map(p => `<tr><td>${p.date}</td><td>${fmtFull(p.views)}</td>
+      <td class="${p.delta < 0 ? 'dir-down' : ''}">${sign(p.delta)}${fmtFull(p.delta)}</td>
+      <td>${p.rate.toFixed(2)}%</td></tr>`).join('')}</tbody></table></div>`;
+  if (!single) {
+    const svg = $('#drill-chart');
+    renderLineChart(svg, [{ id: v.id, name: v.title, color: '#0071e3', points: v.history.map(p => ({ date: p.date, value: p.views })) }], {});
+  }
+}
+
+/* ═══════════════ video id 조회 ═══════════════ */
+function showIdMsg(text) {
+  const el = $('#id-msg');
+  el.textContent = text;
+  el.style.display = 'block';
+  clearTimeout(showIdMsg._t);
+  showIdMsg._t = setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+async function lookupId() {
+  const id = $('#id-input').value.trim();
+  if (!id) return;
+  const v = DATA.videos.find(x => x.id === id);
+  if (!v) { showIdMsg('해당 id의 스크랩 기록이 없습니다'); return; }
+  // C옵션: API 키가 있으면 실시간 값 조회 (실패해도 무시)
+  liveStat = null;
+  if (CFG.YT_API_KEY) {
+    try {
+      const r = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${encodeURIComponent(id)}&key=${encodeURIComponent(CFG.YT_API_KEY)}`);
+      if (r.ok) {
+        const j = await r.json();
+        const s = j.items && j.items[0] && j.items[0].statistics;
+        if (s && s.viewCount) liveStat = { id, views: +s.viewCount };
+      }
+    } catch (e) { /* 실시간 조회 실패 — 로컬 데이터로 계속 */ }
+  }
+  setHighlight(id, true);
+}
+
+/* ═══════════════ B옵션: 구글시트 CSV ═══════════════ */
+function parseCsv(text) {
+  // 간단 CSV 파서 (따옴표 필드 지원)
+  const rows = [];
+  let row = [], field = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"') { if (text[i+1] === '"') { field += '"'; i++; } else q = false; }
+      else field += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') { row.push(field); field = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (field || row.length) { row.push(field); rows.push(row); row = []; field = ''; }
+      if (c === '\r' && text[i+1] === '\n') i++;
+    } else field += c;
+  }
+  if (field || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+function buildFromSheetRows(rows) {
+  // 헤더: date,title,video_id,delta,views,increase-rate — build 스크립트와 동일한 §2 정제
+  const head = rows[0].map(h => h.trim().toLowerCase());
+  const ix = k => head.indexOf(k);
+  const iDate = ix('date'), iTitle = ix('title'), iId = ix('video_id'), iViews = ix('views');
+  if (iDate < 0 || iId < 0 || iViews < 0) throw new Error('CSV 열 구조가 예상과 다릅니다');
+  const byKey = new Map();
+  for (const r of rows.slice(1)) {
+    const rawDate = (r[iDate] || '').trim();
+    const day = rawDate.slice(0, 10).replace(/[./]/g, '-');
+    const views = Number(String(r[iViews]).replace(/,/g, ''));
+    const id = (r[iId] || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !id || !Number.isFinite(views)) continue;
+    const k = id + '|' + day;
+    const prev = byKey.get(k);
+    if (!prev || views > prev.views)
+      byKey.set(k, { id, day, views, title: (r[iTitle] || '').trim() });
+  }
+  const byVideo = new Map();
+  for (const p of byKey.values()) {
+    if (!byVideo.has(p.id)) byVideo.set(p.id, []);
+    byVideo.get(p.id).push(p);
+  }
+  let minDay = null, maxDay = null;
+  const videos = [];
+  for (const [id, pts] of byVideo) {
+    pts.sort((a, b) => a.day.localeCompare(b.day));
+    const history = pts.map((p, i) => {
+      const prev = i > 0 ? pts[i-1] : null;
+      const delta = prev ? p.views - prev.views : 0;
+      const rate = prev && prev.views > 0 ? Math.round(delta / prev.views * 10000) / 100 : 0;
+      return { date: p.day, views: p.views, delta, rate };
+    });
+    if (!minDay || history[0].date < minDay) minDay = history[0].date;
+    if (!maxDay || history[history.length-1].date > maxDay) maxDay = history[history.length-1].date;
+    const title = [...pts].reverse().find(p => p.title)?.title || id;
+    videos.push({
+      id, title,
+      url: `https://www.youtube.com/watch?v=${id}`,
+      thumb: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
+      currentViews: history[history.length-1].views,
+      history,
+    });
+  }
+  videos.sort((a, b) => b.currentViews - a.currentViews);
+  return { generatedAt: new Date().toISOString(), dateRange: { start: minDay, end: maxDay }, videos };
+}
+
+/* ═══════════════ 초기화 ═══════════════ */
+async function loadData() {
+  // B옵션: 시트 URL이 있으면 우선 시도, 실패 시 로컬로 폴백
+  if (CFG.SHEET_CSV_URL) {
+    try {
+      const r = await fetch(CFG.SHEET_CSV_URL);
+      if (r.ok) {
+        const d = buildFromSheetRows(parseCsv(await r.text()));
+        if (d.videos.length) { console.log('✅ 구글시트 실시간 데이터 사용 (' + d.videos.length + '개 영상)'); return d; }
+      }
+    } catch (e) { console.warn('시트 연동 실패 — 로컬 데이터로 대체합니다:', e.message); }
+  }
+  if (window.EMBEDDED_DATA) return window.EMBEDDED_DATA; // standalone 버전
+  const r = await fetch('data.json');
+  if (!r.ok) throw new Error('data.json 로드 실패');
+  return r.json();
+}
+
+function init() {
+  METRICS = new Map(DATA.videos.map(v => [v.id, computeMetrics(v, DATA.dateRange.end)]));
+  selectedIds = DATA.videos.slice(0, 5).map(v => v.id); // 조회수 상위 5곡 기본
+
+  const gen = DATA.generatedAt
+    ? new Date(DATA.generatedAt).toLocaleString('sv-SE', { hour12: false }).slice(0, 16)
+    : '-';
+  $('#hd-meta').textContent = `마지막 갱신 ${gen} · 데이터 기간 ${DATA.dateRange.start} ~ ${DATA.dateRange.end}`;
+  $('#foot').textContent = `BNM YouTube 음원 모니터링 — 링크·썸네일은 video_id 기준으로 생성됩니다. 데이터 갱신: node scripts/build-data.mjs`;
+
+  renderKPIs(); renderChart(); renderTable(); renderDrill();
+
+  $('#seg-period').querySelectorAll('button').forEach(b => b.onclick = () => {
+    $('#seg-period .on').classList.remove('on'); b.classList.add('on');
+    period = b.dataset.p; renderChart();
+  });
+  $('#seg-view').querySelectorAll('button').forEach(b => b.onclick = () => {
+    $('#seg-view .on').classList.remove('on'); b.classList.add('on');
+    viewMode = b.dataset.v; renderChart();
+  });
+  $('#seg-num').querySelectorAll('button').forEach(b => b.onclick = () => {
+    $('#seg-num .on').classList.remove('on'); b.classList.add('on');
+    numMode = b.dataset.n; renderKPIs(); renderTable(); renderDrill();
+  });
+  document.querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => {
+    const k = th.dataset.sort;
+    if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = k === 'title' ? 1 : -1; }
+    renderTable();
+  });
+  $('#id-btn').onclick = lookupId;
+  $('#id-input').addEventListener('keydown', e => { if (e.key === 'Enter') lookupId(); });
+  window.addEventListener('resize', () => { renderChart(); });
+}
+
+loadData().then(d => { DATA = d; init(); })
+  .catch(e => {
+    console.error(e);
+    $('#hd-meta').textContent = '데이터 로드 실패 — data.json이 있는지 확인하거나 index_standalone.html을 열어보세요.';
+  });
+</script>
+</body>
+</html>
