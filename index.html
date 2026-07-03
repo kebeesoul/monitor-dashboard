@@ -44,56 +44,39 @@ header {
 }
 .hd-title { font-size: 17px; font-weight: 600; letter-spacing: -0.374px; }
 .hd-meta { font-size: 12px; color: rgba(255,255,255,0.65); letter-spacing: -0.12px; }
-.hd-right { margin-left: auto; display: flex; align-items: center; gap: 8px; position: relative; }
-#id-input {
+.hd-right { margin-left: auto; position: relative; }
+.reg-form { display: flex; flex-direction: column; gap: 6px; position: relative; }
+.reg-fields { display: flex; gap: 6px; }
+.reg-url-row { display: flex; gap: 6px; align-items: center; }
+.reg-form input {
   background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25);
-  color: #fff; border-radius: 8px; padding: 6px 12px; font-size: 13px; width: 300px;
+  color: #fff; border-radius: 8px; padding: 6px 12px; font-size: 13px;
   font-family: var(--font);
 }
-#id-input::placeholder { color: rgba(255,255,255,0.45); }
-#id-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-#id-btn {
-  background: var(--accent); color: #fff; border: none; border-radius: 8px;
+.reg-form input::placeholder { color: rgba(255,255,255,0.45); }
+.reg-form input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+#reg-artist, #reg-title { flex: 1; min-width: 0; width: 100%; }
+#id-input { flex: 1; min-width: 220px; }
+#id-btn, #reg-submit {
+  color: #fff; border: none; border-radius: 8px; flex: none;
   padding: 6px 15px; font-size: 13px; cursor: pointer; font-family: var(--font);
 }
-#id-btn:hover { filter: brightness(1.1); }
+#id-btn { background: rgba(255,255,255,0.16); }
+#reg-submit { background: var(--accent); }
+#id-btn:hover, #reg-submit:hover { filter: brightness(1.15); }
+#reg-submit:disabled { opacity: 0.5; cursor: default; }
 #id-msg {
-  position: absolute; top: calc(100% + 6px); right: 0;
+  position: absolute; top: calc(100% + 6px); right: 0; max-width: 340px;
   background: #1d1d1f; color: #ffb4ab; font-size: 12px;
-  padding: 6px 12px; border-radius: 8px; white-space: nowrap; display: none;
+  padding: 6px 12px; border-radius: 8px; display: none; z-index: 40;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
 }
 #id-msg.ok { color: #7ee2a8; }
-/* 새 곡 등록 패널 (URL이 미등록 영상일 때) */
-#register {
-  position: absolute; top: calc(100% + 6px); right: 0; z-index: 40;
-  background: #1d1d1f; color: #fff; border-radius: 10px; padding: 14px;
-  width: 320px; display: none; box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-}
-#register h3 { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
-#register .r-sub { font-size: 11px; color: rgba(255,255,255,0.55); margin-bottom: 10px; }
-#register label { display: block; font-size: 11px; color: rgba(255,255,255,0.6); margin: 8px 0 3px; }
-#register input {
-  width: 100%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
-  color: #fff; border-radius: 6px; padding: 6px 9px; font-size: 13px; font-family: var(--font);
-}
-#register input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-#register input[readonly] { color: rgba(255,255,255,0.55); background: rgba(255,255,255,0.05); }
-#register .r-actions { display: flex; gap: 8px; margin-top: 12px; }
-#register .r-actions button {
-  flex: 1; border: none; border-radius: 7px; padding: 7px; font-size: 12px;
-  cursor: pointer; font-family: var(--font);
-}
-#reg-submit { background: var(--accent); color: #fff; }
-#reg-submit:hover { filter: brightness(1.1); }
-#reg-submit:disabled { opacity: 0.5; cursor: default; }
-#reg-cancel { background: rgba(255,255,255,0.14); color: #fff; }
-#reg-status { font-size: 11px; margin-top: 8px; min-height: 14px; }
-#reg-status.err { color: #ffb4ab; } #reg-status.ok { color: #7ee2a8; }
-#reg-status.info { color: rgba(255,255,255,0.6); }
+#id-msg.info { color: rgba(255,255,255,0.7); }
 
 /* ── KPI ── */
 .kpi-row {
-  display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 16px 0;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0;
 }
 .kpi {
   background: var(--card); border-radius: var(--radius); padding: 14px 16px;
@@ -173,6 +156,7 @@ table.perf tbody tr:hover { background: #fafafc; }
 table.perf tbody tr.sel { background: #eef5fd; }
 .t-thumb { width: 64px; height: 36px; object-fit: cover; border-radius: 5px; display: block; background: #e8e8ed; }
 .t-title { max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
+.t-artist { font-size: 11px; color: var(--ink-3); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .badge {
   display: inline-block; font-size: 10.5px; font-weight: 600; border-radius: 980px;
   padding: 1px 8px; margin-left: 4px; letter-spacing: 0;
@@ -193,7 +177,8 @@ footer { margin-top: 14px; font-size: 11px; color: var(--ink-3); text-align: cen
 }
 @media (max-width: 640px) {
   .kpi-row { grid-template-columns: 1fr; }
-  #id-input { width: 140px; }
+  #id-input { min-width: 120px; }
+  .hd-right { width: 100%; }
 }
 </style>
 </head>
@@ -205,23 +190,17 @@ footer { margin-top: 14px; font-size: 11px; color: var(--ink-3); text-align: cen
       <div class="hd-meta" id="hd-meta">데이터 로딩 중…</div>
     </div>
     <div class="hd-right">
-      <input id="id-input" type="text" placeholder="유튜브 URL 붙여넣기 (조회 / 새 곡 등록)" spellcheck="false">
-      <button id="id-btn">조회</button>
-      <div id="id-msg"></div>
-      <div id="register">
-        <h3>새 곡 등록</h3>
-        <div class="r-sub">이 영상은 아직 추적 목록에 없습니다. 시트에 추가합니다.</div>
-        <label>video id</label>
-        <input id="reg-id" type="text" readonly>
-        <label>아티스트명</label>
-        <input id="reg-artist" type="text" placeholder="예: 브라운아이드소울" spellcheck="false">
-        <label>곡명</label>
-        <input id="reg-title" type="text" placeholder="예: 비가와" spellcheck="false">
-        <div class="r-actions">
-          <button id="reg-cancel">취소</button>
-          <button id="reg-submit">시트에 등록</button>
+      <div class="reg-form">
+        <div class="reg-fields">
+          <input id="reg-artist" type="text" placeholder="아티스트" spellcheck="false">
+          <input id="reg-title" type="text" placeholder="곡명" spellcheck="false">
         </div>
-        <div id="reg-status"></div>
+        <div class="reg-url-row">
+          <input id="id-input" type="text" placeholder="유튜브 URL 붙여넣기" spellcheck="false">
+          <button id="id-btn">조회</button>
+          <button id="reg-submit">등록</button>
+        </div>
+        <div id="id-msg"></div>
       </div>
     </div>
   </div>
@@ -502,9 +481,6 @@ function colorOf(id) {
 function renderKPIs() {
   const vs = DATA.videos;
   const end = DATA.dateRange.end;
-  const totalViews = vs.reduce((a, v) => a + v.currentViews, 0);
-  const startViews = vs.reduce((a, v) => a + v.history[0].views, 0);
-  const totalGainPct = startViews > 0 ? (totalViews - startViews) / startViews * 100 : 0;
 
   let d7all = 0, d7prevAll = 0;
   for (const v of vs) { const m = METRICS.get(v.id); d7all += m.d7; d7prevAll += m.d7prev; }
@@ -514,20 +490,18 @@ function renderKPIs() {
   for (const v of vs) { const m = METRICS.get(v.id); if (!top || m.d7 > METRICS.get(top.id).d7) top = v; }
   const topM = METRICS.get(top.id);
   const topPct = topM.d7prev > 0 ? (topM.d7 - topM.d7prev) / topM.d7prev * 100 : 0;
+  const topLabel = top.artist ? `${top.artist} – ${top.title}` : top.title;
   const newCount = vs.filter(v => v.history.length < 30).length;
 
   $('#kpi-row').innerHTML = `
     <div class="kpi"><div class="k-label">추적 영상 수</div>
       <div class="k-value">${vs.length}</div>
       <div class="k-sub">신규 편입 ${newCount}개 포함</div></div>
-    <div class="kpi"><div class="k-label">총 누적 조회수</div>
-      <div class="k-value">${fmt(totalViews)}</div>
-      <div class="k-sub">${dirHtml(totalGainPct)} 추적 시작 대비</div></div>
     <div class="kpi"><div class="k-label">최근 7일 총 증가량</div>
       <div class="k-value">+${fmt(d7all)}</div>
       <div class="k-sub">${dirHtml(d7pct)} 직전 7일 대비</div></div>
     <div class="kpi"><div class="k-label">최고 성장 영상 (7일)</div>
-      <div class="k-value small" title="${esc(top.title)}">${esc(top.title.length > 22 ? top.title.slice(0,22) + '…' : top.title)}</div>
+      <div class="k-value small" title="${esc(topLabel)}">${esc(topLabel.length > 22 ? topLabel.slice(0,22) + '…' : topLabel)}</div>
       <div class="k-sub">+${fmt(topM.d7)} · ${dirHtml(topPct)}</div></div>
     <div class="kpi"><div class="k-label">최신 스크랩 날짜</div>
       <div class="k-value small">${end}</div>
@@ -610,7 +584,7 @@ function renderTable() {
   $('#tbl-body').innerHTML = rows.map(({ v, m }) => `
     <tr data-id="${v.id}" class="${v.id === highlightId ? 'sel' : ''}">
       <td class="left"><img class="t-thumb" src="${v.thumb}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"></td>
-      <td class="left"><div class="t-title" title="${esc(v.title)}">${esc(v.title)}</div></td>
+      <td class="left"><div class="t-title" title="${esc(v.title)}">${esc(v.title)}</div>${v.artist ? `<div class="t-artist">${esc(v.artist)}</div>` : ''}</td>
       <td>${fmt(v.currentViews)}</td>
       <td class="${m.d7 >= 0 ? '' : 'dir-down'}">${sign(m.d7)}${fmt(m.d7)}</td>
       <td>${m.lastRate >= 0 ? '' : '-'}${Math.abs(m.lastRate).toFixed(2)}%</td>
@@ -666,6 +640,7 @@ function renderDrill() {
       <img class="d-thumb" src="${v.thumb}" alt="${esc(v.title)}" onerror="this.style.display='none'"></a>
     <div class="d-title"><a href="${v.url}" target="_blank" rel="noopener">${esc(v.title)} ↗</a>
       ${badgeHtml(m)}</div>
+    ${v.artist ? `<div style="font-size:12px;color:var(--ink-3);margin-top:-4px">${esc(v.artist)}</div>` : ''}
     <div style="font-size:13px">현재 <b>${fmtFull(v.currentViews)}</b>회
       ${liveStat && liveStat.id === v.id ? `<span class="d-live"> · 실시간 ${fmtFull(liveStat.views)}회 (YouTube API)</span>` : ''}</div>
     ${single
@@ -698,23 +673,26 @@ function extractVideoId(input) {
   return null;
 }
 
-function showIdMsg(text, ok) {
+function showIdMsg(text, ok, variant) {
   const el = $('#id-msg');
   el.textContent = text;
-  el.className = ok ? 'ok' : '';
+  el.className = variant || (ok ? 'ok' : '');
   el.style.display = 'block';
   clearTimeout(showIdMsg._t);
   showIdMsg._t = setTimeout(() => { el.style.display = 'none'; }, 4000);
 }
 
+// [조회] URL로 기존 영상 찾기. 미등록이면 아티스트·곡명 자동 채움 안내.
 async function lookupId() {
   const raw = $('#id-input').value;
   const id = extractVideoId(raw);
   if (!id) { showIdMsg('유튜브 URL에서 영상 id를 찾지 못했습니다'); return; }
   const v = DATA.videos.find(x => x.id === id);
-  if (!v) { openRegister(id); return; } // 미등록 → 새 곡 등록 흐름
-  closeRegister();
-  // C옵션: API 키가 있으면 실시간 값 조회 (실패해도 무시)
+  if (!v) {
+    showIdMsg('미등록 영상입니다 — 아티스트·곡명 입력 후 [등록]하세요', false, 'info');
+    await autofillMeta(id); // YT 키 있으면 아티스트·곡명 칸 자동 채움
+    return;
+  }
   liveStat = null;
   if (CFG.YT_API_KEY) {
     try {
@@ -729,53 +707,35 @@ async function lookupId() {
   setHighlight(id, true);
 }
 
-/* ── 새 곡 등록 패널 ── */
-function closeRegister() { $('#register').style.display = 'none'; }
-async function openRegister(id) {
-  $('#reg-id').value = id;
-  $('#reg-artist').value = '';
-  $('#reg-title').value = '';
-  const st = $('#reg-status');
-  $('#register').style.display = 'block';
-  // 자동 추정: YT API 키가 있으면 제목·채널명을 가져와 칸을 미리 채움 (수정 가능)
-  if (CFG.YT_API_KEY) {
-    st.className = 'info'; st.textContent = '유튜브에서 제목·채널 불러오는 중…';
-    try {
-      const r = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${encodeURIComponent(id)}&key=${encodeURIComponent(CFG.YT_API_KEY)}`);
-      const j = await r.json();
-      const sn = j.items && j.items[0] && j.items[0].snippet;
-      if (sn) {
-        $('#reg-artist').value = (sn.channelTitle || '').replace(/\s*-\s*Topic$/i, '').trim();
-        $('#reg-title').value = (sn.title || '').trim();
-        st.className = 'info'; st.textContent = '자동 채움 완료 — 확인·수정 후 등록하세요';
-      } else {
-        st.className = 'err'; st.textContent = '유튜브에서 정보를 못 찾음 — 직접 입력하세요';
-      }
-    } catch (e) {
-      st.className = 'err'; st.textContent = '자동 조회 실패 — 직접 입력하세요';
-    }
-  } else {
-    st.className = 'info'; st.textContent = '아티스트·곡명을 입력한 뒤 등록하세요';
-  }
-  $('#reg-artist').focus();
+// YT API 키가 있을 때 채널명→아티스트, 제목→곡명 자동 채움 (비었을 때만)
+async function autofillMeta(id) {
+  if (!CFG.YT_API_KEY) return;
+  try {
+    const r = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${encodeURIComponent(id)}&key=${encodeURIComponent(CFG.YT_API_KEY)}`);
+    const j = await r.json();
+    const sn = j.items && j.items[0] && j.items[0].snippet;
+    if (!sn) return;
+    if (!$('#reg-artist').value.trim())
+      $('#reg-artist').value = (sn.channelTitle || '').replace(/\s*-\s*Topic$/i, '').trim();
+    if (!$('#reg-title').value.trim())
+      $('#reg-title').value = (sn.title || '').trim();
+    showIdMsg('자동 채움 완료 — 확인·수정 후 [등록]하세요', true, 'info');
+  } catch (e) { /* 자동 조회 실패 — 수동 입력 */ }
 }
 
+// [등록] 아티스트·곡명·URL → Links 시트에 기록
 async function submitRegister() {
-  const payload = {
-    video_id: $('#reg-id').value.trim(),
-    artist: $('#reg-artist').value.trim(),
-    title: $('#reg-title').value.trim(),
-    youtube_url: `https://www.youtube.com/watch?v=${$('#reg-id').value.trim()}`,
-  };
-  const st = $('#reg-status');
-  if (!payload.artist || !payload.title) { st.className = 'err'; st.textContent = '아티스트명과 곡명을 모두 입력하세요'; return; }
-  if (!CFG.SHEET_WRITE_URL) {
-    st.className = 'err';
-    st.textContent = '시트 쓰기 URL(config.js의 SHEET_WRITE_URL)이 아직 설정되지 않았습니다';
-    return;
-  }
+  const id = extractVideoId($('#id-input').value);
+  const artist = $('#reg-artist').value.trim();
+  const title = $('#reg-title').value.trim();
+  if (!id) { showIdMsg('유튜브 URL을 먼저 입력하세요'); return; }
+  if (!artist || !title) { showIdMsg('아티스트와 곡명을 모두 입력하세요'); return; }
+  if (!CFG.SHEET_WRITE_URL) { showIdMsg('시트 쓰기 URL(config.js의 SHEET_WRITE_URL)이 아직 설정되지 않았습니다'); return; }
+
+  const payload = { video_id: id, artist, title, youtube_url: `https://www.youtube.com/watch?v=${id}` };
   const btn = $('#reg-submit');
-  btn.disabled = true; st.className = 'info'; st.textContent = '시트에 등록 중…';
+  btn.disabled = true; showIdMsg('시트에 등록 중…', false, 'info');
+  const clearFields = () => { $('#id-input').value = ''; $('#reg-artist').value = ''; $('#reg-title').value = ''; };
   try {
     // Apps Script 웹앱은 프리플라이트를 안 받으므로 text/plain 단순요청으로 전송
     const r = await fetch(CFG.SHEET_WRITE_URL, {
@@ -787,11 +747,10 @@ async function submitRegister() {
     let res = {};
     try { res = await r.json(); } catch (_) { res = { ok: r.ok }; }
     if (res.ok === false && res.reason === 'duplicate') {
-      st.className = 'info'; st.textContent = '이미 시트에 등록된 영상입니다';
+      showIdMsg('이미 시트에 등록된 영상입니다', false, 'info');
     } else {
-      st.className = 'ok'; st.textContent = '✅ 시트에 등록했습니다';
-      showIdMsg('✅ ' + payload.title + ' 등록 완료', true);
-      setTimeout(closeRegister, 1200);
+      showIdMsg(`✅ ${artist} – ${title} 등록 완료`, true);
+      clearFields();
     }
   } catch (e) {
     // CORS로 응답을 못 읽는 환경 → no-cors 재시도(전송은 성공하나 결과 확인 불가)
@@ -801,10 +760,10 @@ async function submitRegister() {
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(payload),
       });
-      st.className = 'ok'; st.textContent = '전송했습니다 — 시트에서 확인해 주세요';
-      setTimeout(closeRegister, 1400);
+      showIdMsg('전송했습니다 — 시트에서 확인해 주세요', true);
+      clearFields();
     } catch (e2) {
-      st.className = 'err'; st.textContent = '등록 실패: ' + (e2.message || e.message);
+      showIdMsg('등록 실패: ' + (e2.message || e.message));
     }
   } finally {
     btn.disabled = false;
@@ -831,8 +790,27 @@ function parseCsv(text) {
   if (field || row.length) { row.push(field); rows.push(row); }
   return rows;
 }
-function buildFromSheetRows(rows) {
+// Links CSV → id별 {artist, title} 맵 (헤더 이름으로 열을 찾아 빈 열/재배치에 안전)
+function parseLinksMap(rows) {
+  const map = new Map();
+  if (!rows || !rows.length) return map;
+  const head = rows[0].map(h => h.trim().toLowerCase());
+  const iId = head.indexOf('video_id'), iArtist = head.indexOf('artist'), iTitle = head.indexOf('title');
+  if (iId < 0) return map;
+  for (const r of rows.slice(1)) {
+    const id = (r[iId] || '').trim();
+    if (!id) continue;
+    map.set(id, {
+      artist: iArtist >= 0 ? (r[iArtist] || '').trim() : '',
+      title: iTitle >= 0 ? (r[iTitle] || '').trim() : '',
+    });
+  }
+  return map;
+}
+
+function buildFromSheetRows(rows, linksMap) {
   // 헤더: date,title,video_id,delta,views,increase-rate — build 스크립트와 동일한 §2 정제
+  const links = linksMap || new Map();
   const head = rows[0].map(h => h.trim().toLowerCase());
   const ix = k => head.indexOf(k);
   const iDate = ix('date'), iTitle = ix('title'), iId = ix('video_id'), iViews = ix('views');
@@ -866,9 +844,12 @@ function buildFromSheetRows(rows) {
     });
     if (!minDay || history[0].date < minDay) minDay = history[0].date;
     if (!maxDay || history[history.length-1].date > maxDay) maxDay = history[history.length-1].date;
-    const title = [...pts].reverse().find(p => p.title)?.title || id;
+    const meta = links.get(id) || {};
+    // 제목: Links 우선(사람이 정리한 표기) → DailyDelta 폴백
+    const title = meta.title || [...pts].reverse().find(p => p.title)?.title || id;
     videos.push({
       id, title,
+      artist: meta.artist || '',
       url: `https://www.youtube.com/watch?v=${id}`,
       thumb: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
       currentViews: history[history.length-1].views,
@@ -885,17 +866,26 @@ async function loadData() {
   if (CFG.SHEET_CSV_URL) {
     try {
       // 캐시 무효화: 브라우저/구글 캐시가 옛 CSV를 주지 않도록 타임스탬프 부착
-      const bust = (CFG.SHEET_CSV_URL.includes('?') ? '&' : '?') + '_ts=' + Date.now();
-      const r = await fetch(CFG.SHEET_CSV_URL + bust, { cache: 'no-store' });
-      if (r.ok) {
-        const d = buildFromSheetRows(parseCsv(await r.text()));
+      const bust = () => (CFG.SHEET_CSV_URL.includes('?') ? '&' : '?') + '_ts=' + Date.now();
+      // Links 탭도 병행 조회해 아티스트·정리된 제목을 병합 (URL은 DailyDelta→Links로 치환해 유도)
+      const linksUrl = CFG.SHEET_CSV_URL.replace(/sheet=DailyDelta/i, 'sheet=Links');
+      const [rMain, rLinks] = await Promise.all([
+        fetch(CFG.SHEET_CSV_URL + bust(), { cache: 'no-store' }),
+        linksUrl !== CFG.SHEET_CSV_URL
+          ? fetch(linksUrl + bust(), { cache: 'no-store' }).catch(() => null)
+          : Promise.resolve(null),
+      ]);
+      if (rMain.ok) {
+        let linksMap = new Map();
+        try { if (rLinks && rLinks.ok) linksMap = parseLinksMap(parseCsv(await rLinks.text())); } catch (_) { /* 아티스트 없이 진행 */ }
+        const d = buildFromSheetRows(parseCsv(await rMain.text()), linksMap);
         if (d.videos.length) {
           dataSource = 'sheet';
-          console.log('✅ 구글시트 실시간 데이터 사용 (' + d.videos.length + '개 영상)');
+          console.log(`✅ 구글시트 실시간 데이터 사용 (${d.videos.length}개 영상 / 아티스트 ${linksMap.size}건 병합)`);
           return d;
         }
       }
-      console.warn('시트 응답이 비었거나 오류 — 로컬 데이터로 대체합니다 (HTTP ' + r.status + ')');
+      console.warn('시트 응답이 비었거나 오류 — 로컬 데이터로 대체합니다 (HTTP ' + rMain.status + ')');
     } catch (e) { console.warn('시트 연동 실패 — 로컬 데이터로 대체합니다:', e.message); }
   }
   if (window.EMBEDDED_DATA) { dataSource = 'embedded'; return window.EMBEDDED_DATA; } // standalone 버전
@@ -937,9 +927,9 @@ function init() {
   });
   $('#id-btn').onclick = lookupId;
   $('#id-input').addEventListener('keydown', e => { if (e.key === 'Enter') lookupId(); });
-  $('#reg-cancel').onclick = closeRegister;
   $('#reg-submit').onclick = submitRegister;
   $('#reg-title').addEventListener('keydown', e => { if (e.key === 'Enter') submitRegister(); });
+  $('#reg-artist').addEventListener('keydown', e => { if (e.key === 'Enter') $('#reg-title').focus(); });
   window.addEventListener('resize', () => { renderChart(); });
 }
 

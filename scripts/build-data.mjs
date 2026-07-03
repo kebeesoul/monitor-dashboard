@@ -74,11 +74,15 @@ for (const p of byKey.values()) {
   byVideo.get(p.id).push(p);
 }
 
-// Links: 제목 보강용으로만 사용 (URL은 신뢰하지 않음)
-const linkTitles = new Map();
+// Links: 아티스트·제목 보강용 (URL은 신뢰하지 않음)
+const linkMeta = new Map();
 if (sheetNames.includes('Links')) {
   for (const l of XLSX.utils.sheet_to_json(wb.Sheets['Links'], { defval: null })) {
-    if (l.video_id && l.title) linkTitles.set(String(l.video_id).trim(), String(l.title).trim());
+    if (!l.video_id) continue;
+    linkMeta.set(String(l.video_id).trim(), {
+      title: l.title ? String(l.title).trim() : '',
+      artist: l.artist ? String(l.artist).trim() : '',
+    });
   }
 }
 
@@ -98,13 +102,15 @@ for (const [id, points] of byVideo) {
   if (!minDay || first < minDay) minDay = first;
   if (!maxDay || last > maxDay) maxDay = last;
 
-  // 제목: DailyDelta 마지막 행 우선, 비면 Links로 보강
+  // 제목: Links(사람이 정리한 표기) 우선 → DailyDelta 마지막 행 폴백
+  const meta = linkMeta.get(id) || {};
   const lastTitle = [...points].reverse().find(p => p.title)?.title;
-  const title = lastTitle || linkTitles.get(id) || id;
+  const title = meta.title || lastTitle || id;
 
   videos.push({
     id,
     title,
+    artist: meta.artist || '',
     // 링크·썸네일은 무조건 video_id로 재구성 (Links URL 불일치 방어)
     url: `https://www.youtube.com/watch?v=${id}`,
     thumb: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
