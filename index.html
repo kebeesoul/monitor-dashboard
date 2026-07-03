@@ -269,6 +269,10 @@ footer { margin-top: 14px; font-size: 11px; color: var(--ink-3); text-align: cen
 /* ═══════════════ 유틸 ═══════════════ */
 const $ = s => document.querySelector(s);
 const CFG = window.DASH_CONFIG || { SHEET_CSV_URL: '', YT_API_KEY: '' };
+// config에 실수로 섞인 공백·줄바꿈이 URL을 깨지 않도록 방어적으로 정리
+['SHEET_CSV_URL', 'SHEET_WRITE_URL', 'YT_API_KEY'].forEach(k => {
+  if (typeof CFG[k] === 'string') CFG[k] = CFG[k].trim();
+});
 const PALETTE = ['#0071e3','#d97706','#059669','#dc2626','#7c3aed','#0891b2','#be185d','#4d7c0f','#b45309','#475569'];
 
 let numMode = 'abbr'; // 'abbr' | 'full'
@@ -736,6 +740,9 @@ async function submitRegister() {
   const btn = $('#reg-submit');
   btn.disabled = true; showIdMsg('시트에 등록 중…', false, 'info');
   const clearFields = () => { $('#id-input').value = ''; $('#reg-artist').value = ''; $('#reg-title').value = ''; };
+  // 25초 넘게 응답이 없으면 중단 (배포 오류 시 무한 대기 방지)
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 25000);
   try {
     // Apps Script 웹앱은 프리플라이트를 안 받으므로 text/plain 단순요청으로 전송
     const r = await fetch(CFG.SHEET_WRITE_URL, {
@@ -743,29 +750,31 @@ async function submitRegister() {
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(payload),
       redirect: 'follow',
+      signal: ctrl.signal,
     });
-    let res = {};
-    try { res = await r.json(); } catch (_) { res = { ok: r.ok }; }
-    if (res.ok === false && res.reason === 'duplicate') {
-      showIdMsg('이미 시트에 등록된 영상입니다', false, 'info');
-    } else {
+    const bodyText = await r.text();
+    let res = null;
+    try { res = JSON.parse(bodyText); } catch (_) { /* JSON 아님 = 구글 오류/로그인 페이지 */ }
+    if (res && res.ok === true) {
       showIdMsg(`✅ ${artist} – ${title} 등록 완료`, true);
       clearFields();
+    } else if (res && res.reason === 'duplicate') {
+      showIdMsg('이미 시트에 등록된 영상입니다', false, 'info');
+    } else if (res && res.reason) {
+      showIdMsg('등록 거부됨: ' + res.reason);
+    } else {
+      // JSON이 아니면 배포 접근 문제 — 응답을 못 읽었으니 성공으로 오인하지 않는다
+      showIdMsg('등록 응답을 확인하지 못했습니다 — 웹앱 배포(액세스: 모든 사용자)를 확인하세요');
+      console.warn('SHEET_WRITE_URL 응답(JSON 아님):', bodyText.slice(0, 200));
     }
   } catch (e) {
-    // CORS로 응답을 못 읽는 환경 → no-cors 재시도(전송은 성공하나 결과 확인 불가)
-    try {
-      await fetch(CFG.SHEET_WRITE_URL, {
-        method: 'POST', mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload),
-      });
-      showIdMsg('전송했습니다 — 시트에서 확인해 주세요', true);
-      clearFields();
-    } catch (e2) {
-      showIdMsg('등록 실패: ' + (e2.message || e.message));
+    if (e.name === 'AbortError') {
+      showIdMsg('등록 시간 초과 — 웹앱 배포 상태를 확인하세요');
+    } else {
+      showIdMsg('등록 실패(네트워크/CORS): ' + e.message);
     }
   } finally {
+    clearTimeout(timer);
     btn.disabled = false;
   }
 }
