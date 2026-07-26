@@ -1,202 +1,104 @@
 # BNM YouTube 음원 모니터링 대시보드
 
-브랜뉴뮤직 계열 음원(뮤비/플레이리스트) 30개 영상의 유튜브 조회수를
-**한 화면에서** 수치·추세·맥락으로 보는 대시보드입니다.
+공개 Google Sheet의 `DailyDelta`와 `Links`를 읽어 영상별 조회수와 추세를 보여주는 읽기 전용 웹 대시보드입니다.
 
-코딩 지식이 없어도 아래 순서만 따라 하면 됩니다.
-
----
-
-## 0. 지금 데이터는 어디서 오나 (중요)
-
-이 대시보드는 **버전이 두 개**이고, 데이터 출처가 다릅니다. 헤더 왼쪽 배지로 구분됩니다:
-
-| 파일 | 배지 | 데이터 출처 | 새 곡·수치 자동 반영? |
-|---|---|---|---|
-| **`index.html`** (서버로 열기) | 🟢 라이브 시트 | 구글시트 `DailyDelta` 탭을 **실시간**으로 읽음 | ✅ 시트 고치고 새로고침만 |
-| **`index_standalone.html`** (더블클릭) | 📦 내장 스냅샷 | 빌드 시점에 박제된 데이터 | ❌ 다시 빌드해야 갱신 |
-
-즉, **시트에 쌓이는 최신 데이터를 바로 보려면 `index.html`을 서버로 여세요.**
-`index_standalone.html`은 인터넷/서버 없이 공유할 때 쓰는 "그 순간의 사진"입니다.
-
-> 🟢 라이브가 어쩌다 실패해도(오프라인 등) 로컬 `data.json`으로 자동 대체되어 화면은 안 깨집니다.
-
----
-
-## 0-1. 새 곡을 추가하려면 — DailyDelta에 넣으세요 (Links 아님)
-
-**가장 흔한 오해:** "Links 탭에 video id를 넣으면 대시보드에 뜬다" → **틀립니다.**
-
-- 대시보드는 곡 목록과 조회수 추세를 **오직 `DailyDelta` 탭에서** 읽습니다.
-- 새 곡이 화면에 나오려면 **그 곡의 조회수 행이 `DailyDelta`에 쌓여야** 합니다 (스크래퍼가 매일 append).
-- `Links` 탭은 **이름표(제목) 보강용**일 뿐입니다. 여기에만 id를 넣으면 아무 일도 안 일어납니다.
-- 링크·썸네일은 `Links`의 URL과 무관하게 **항상 video_id로 자동 생성**됩니다.
-
-> 한 줄 요약: **곡 추가 = `DailyDelta`에 그 id의 조회수 데이터가 들어오는 것.** Links는 선택적 라벨.
-
----
-
-## 1. 처음 여는 법
-
-**최신 데이터를 보려면** (라이브 시트 연동):
+## 로컬에서 HTML 보기
 
 ```bash
-# 프로젝트 폴더에서 (둘 중 아무거나)
-python3 -m http.server 8901        # → 브라우저에서 http://localhost:8901/index.html
-npx serve .
+npm run sync
+npm run dev
 ```
 
-**서버 없이 공유용 스냅샷을 보려면**: `index_standalone.html` 파일을 더블클릭하세요.
-(데이터가 통째로 들어 있어 인터넷/서버 없이 열립니다. 썸네일만 인터넷 연결 시 표시.)
+브라우저에서 다음 주소를 엽니다.
 
----
+```text
+http://127.0.0.1:8901
+```
 
-## 2. 데이터 갱신법
+- `npm run sync`: Google Sheet 최신 데이터를 `data.json`과 `index_standalone.html`에 저장
+- `npm run dev`: 정적 HTML과 `/api/dashboard`를 함께 제공
+- 종료: 실행 중인 터미널에서 `Ctrl+C`
 
-### 라이브 시트를 쓰는 경우 (기본)
-구글시트 `DailyDelta` 탭을 고치고 `index.html`을 **새로고침**하면 끝입니다. 빌드 불필요.
+`python3 -m http.server`도 정적 스냅샷 확인에는 사용할 수 있지만 `/api/dashboard`를 제공하지 않으므로 개발 시에는 `npm run dev`를 사용합니다.
 
-### 스냅샷/오프라인 버전을 갱신하려면 (엑셀 기반)
+## 데이터 규칙
 
-1. 새 엑셀 파일을 `data/` 폴더에 넣습니다.
-   파일명은 `BNM YT View Tracker.xlsx` 또는 `BNM_YT_View_Tracker.xlsx` 둘 다 인식합니다.
-2. 터미널에서 프로젝트 폴더로 이동해 아래 한 줄을 실행합니다:
+단일 설정 파일은 `dashboard.config.json`입니다.
+
+1. `DailyDelta`가 날짜·video_id·조회수의 원본입니다.
+2. `Links`가 공개 영상 목록, 아티스트, 표시 제목, YouTube 업로드일의 원본입니다.
+3. 두 탭에 모두 존재하는 유효한 11자 video_id만 표시합니다.
+4. `DailyDelta`의 가장 이른 유효 날짜가 자동 시작일입니다.
+5. 같은 영상·날짜의 중복 행은 가장 큰 조회수를 사용합니다.
+6. 첫 포인트의 delta와 rate는 0이며 이후 값은 조회수 차이로 재계산합니다.
+7. URL과 썸네일은 video_id로 생성합니다.
+
+날짜를 코드에 하드코딩하거나 로컬 Excel을 원본으로 사용하지 않습니다.
+
+## 실행 구조
+
+```text
+Browser
+  -> /api/dashboard
+  -> Vercel Function 또는 로컬 dev server
+  -> Google Sheet DailyDelta + Links
+  -> 검증·정규화된 JSON
+```
+
+Google Sheet 요청이 실패하면 API는 배포 시점의 `data.json`을 반환합니다. API 자체가 없는 단순 정적 서버에서도 `index.html`은 `data.json`으로 폴백합니다.
+
+## 주요 명령
 
 ```bash
-node scripts/build-data.mjs
+npm run dev      # 로컬 서버
+npm run sync     # Google Sheet -> 스냅샷/standalone 생성
+npm run build    # sync와 동일, Vercel 빌드용
+npm test         # 데이터 규칙 테스트
 ```
 
-3. 끝. `data.json`과 `index_standalone.html`이 자동으로 새로 만들어집니다.
-   콘솔에 "영상 30개 / 유효 포인트 N개 / 스킵 M개 / 중복제거 K행" 요약이 나오면 성공입니다.
+## Vercel 배포
 
-> 처음 한 번만: `npm install` 을 먼저 실행해 주세요 (엑셀을 읽는 부품 설치).
+### 권장: Git 저장소 연결
 
-### 빌드가 자동으로 처리하는 정제 작업
+1. 이 폴더를 GitHub, GitLab 또는 Bitbucket 저장소에 올립니다.
+2. Vercel에서 **Add New Project**를 선택합니다.
+3. 저장소를 Import합니다.
+4. Framework Preset은 **Other**를 사용합니다.
+5. Build Command는 `npm run build`로 설정합니다.
+6. Production 배포 후 제공된 `*.vercel.app` 주소를 확인합니다.
+7. 필요하면 Project Settings의 Domains에서 자체 도메인을 연결합니다.
 
-엑셀 원본에는 아래 함정들이 있어서, 빌드 때 자동으로 청소합니다:
+Git 연결 후 브랜치와 Pull Request는 Preview Deployment로, 기본 브랜치는 Production으로 운영합니다.
 
-| 함정 | 처리 |
-|---|---|
-| 하루 2회 스크랩된 날의 중복 행 (112행 발견) | 같은 (영상, 날짜)에서 조회수가 가장 큰 행만 유지 |
-| 날짜에 시:분:초가 섞여 있음 | 전부 YYYY-MM-DD 일 단위로 통일 |
-| 원본 delta가 2회 스크랩 탓에 왜곡 | `당일 조회수 − 직전 유효일 조회수`로 재계산 |
-| 원본 increase-rate가 소수값(0.0005=0.05%) | 재계산 delta 기준 %로 새로 산출 |
-| Links 시트의 URL이 video_id와 불일치 (2건) | URL·썸네일을 항상 video_id로 재구성 → 영향 없음 |
+### CLI 배포
 
----
-
-## 3. 화면 사용법
-
-- **상단 오른쪽 입력 폼 (아티스트 / 곡명 / 유튜브 URL)**:
-  - **[조회]** — URL을 붙여넣고 누르면 이미 추적 중인 영상은 상세 분석이 뜹니다.
-    미등록이면 안내가 뜨고(YT API 키가 있으면 아티스트·곡명이 자동으로 채워짐).
-  - **[등록]** — 아티스트·곡명·URL을 채우고 누르면 `Links` 시트 빈 행에 추가됩니다 (아래 §7 참고).
-  - `youtu.be/…`, `youtube.com/watch?v=…`, `music.youtube.com`, `/shorts/`, `&list=…` 등 어떤 형태든
-    자동으로 11자 video id를 뽑아냅니다.
-- **KPI 카드 (4개)**: 추적 영상 수 / 최근 7일 총 증가량 / 최고 성장 영상 / 최신 스크랩 날짜.
-  (아티스트·곡명은 테이블·드릴다운·최고성장 카드에 함께 표시됩니다.)
-- **차트**: 기간(7일/30일/전체), 보기(누적 조회수 ↔ 일일 증가분), 숫자(축약 ↔ 전체 자리수) 전환.
-  "일일 증가분" 보기가 요즘 뜨는 곡을 찾기 좋습니다.
-- **범례 칩**: 클릭하면 그 곡만 진하게(하이라이트), ✕를 누르면 차트에서 뺍니다.
-- **테이블**: 열 제목 클릭으로 정렬, 행 클릭으로 차트 하이라이트 + 상세 패널.
-- **상태 뱃지**:
-  - `가속🔥` 최근 7일이 직전 7일보다 20% 이상 빠르게 성장
-  - `감속` 20% 이상 느려짐
-  - `정체` 최근 증가폭이 그 곡 평소 평균의 30% 미만
-  - `스파이크` 평소(중앙값)의 2배 이상 급등한 날이 있음 (뱃지에 마우스를 올리면 날짜 표시)
-  - `신규` 데이터 30개 미만 — 아직 추세 판단 보류
-
----
-
-## 4. 구글시트 실시간 연동 — B옵션 (현재 ✅ 켜져 있음)
-
-`config.js`의 `SHEET_CSV_URL`에 아래 URL이 이미 들어 있어, `index.html`은 시트의
-`DailyDelta` 탭을 실시간으로 읽습니다:
-
-```
-https://docs.google.com/spreadsheets/d/<시트ID>/gviz/tq?tqx=out:csv&sheet=DailyDelta
+```bash
+npx vercel
+npx vercel --prod
 ```
 
-- 대시보드를 열 때마다 시트 최신 데이터를 자동으로 가져옵니다 (캐시 무효화 포함).
-- 연동이 실패해도 로컬 `data.json`으로 자동 대체되니 화면이 안 깨집니다.
-- **다른 시트로 바꾸려면**: 위 URL의 `<시트ID>` 부분(구글시트 주소의 `/d/` 뒤 긴 문자열)만
-  새 시트 ID로 교체하세요. 그 시트도 "링크가 있는 모든 사용자에게 공개" 상태여야 합니다.
-- **끄려면**: `SHEET_CSV_URL: ""` 로 비우면 로컬 `data.json`만 씁니다.
+첫 명령은 Preview, 두 번째 명령은 Production 배포입니다. Production 배포는 실제 공개 URL을 변경하므로 로컬 검증 후 실행합니다.
 
-> 참고: `gviz` 방식은 별도 "웹에 게시" 없이도 공개 시트면 바로 CSV를 읽습니다.
-> (기존의 파일 → 공유 → 웹에 게시 → CSV 방식으로 뽑은 URL을 넣어도 동작합니다.)
+## 공개 운영 원칙
 
-## 5. (선택) 유튜브 실시간 조회수 — C옵션
-
-YouTube Data API v3 키가 있다면 `config.js`의 `YT_API_KEY: ""`에 넣으세요. 두 가지가 켜집니다:
-1. video id 조회 시 "오늘 실시간 조회수"가 상세 패널·그래프 끝에 붙음.
-2. **새 곡 등록 시 아티스트·곡명 자동 채움** (영상의 채널명 → 아티스트, 제목 → 곡명. 수정 가능).
-
-키가 없으면 이 두 기능만 조용히 꺼지고(등록 시 직접 입력) 나머지는 전부 정상 동작합니다.
-
-> `config.js`는 `.gitignore`에 들어 있어 API 키가 저장소에 올라가지 않습니다.
-
----
-
-## 7. 새 곡 등록하기 (아티스트·곡명·URL → Links 시트) — Apps Script 설정 (1회, 약 5분)
-
-헤더 오른쪽에 **아티스트 / 곡명 / 유튜브 URL** 칸이 있습니다. 세 칸을 채우고 [등록]을 누르면
-시트의 **`Links` 탭 빈 행(위에서부터)** 에 한 줄이 자동으로 채워집니다.
-정적 페이지는 시트에 직접 못 쓰기 때문에, 시트에 작은 "수신 창구"(Apps Script)를 한 번 심어야 합니다.
-
-**설치 순서:**
-1. 대상 구글시트에서 상단 메뉴 **[확장 프로그램] → [Apps Script]** 를 엽니다.
-2. 기본 코드를 지우고, 이 저장소의 [`scripts/apps-script.gs`](scripts/apps-script.gs) 내용을 통째로 붙여넣고 저장(💾).
-3. 우측 상단 **[배포] → [새 배포] → 유형 [웹 앱]**:
-   - 실행 계정: **나**
-   - 액세스 권한: **모든 사용자** ← 반드시 (페이지가 로그인 없이 보내야 하므로)
-4. **[배포]** → 권한 승인 → 나온 **웹 앱 URL(`…/exec`)** 복사.
-5. 그 URL을 `config.js`의 `SHEET_WRITE_URL: ""` 따옴표 안에 붙여넣습니다. → 끝.
-
-**동작:**
-- 아티스트·곡명 입력 + 유튜브 URL 붙여넣기 → [등록]. (URL은 어떤 형태든 자동으로 video id 추출.)
-- [조회]를 누르면: 이미 추적 중이면 상세가 뜨고, 미등록이면 안내가 뜹니다.
-  (YT API 키가 있으면 미등록 영상의 아티스트·곡명이 자동으로 칸에 채워집니다 — 수정 가능.)
-- 데이터는 **`Links` 탭**에서 헤더 이름(`video_id / artist / title / youtube_url`)으로 열을 찾아,
-  **video_id가 빈 가장 위쪽 행부터** 채웁니다. 빈 행이 없으면 맨 아래에 추가합니다.
-- 같은 video_id는 **중복 추가되지 않습니다**. (Links 앞의 빈 열이 있어도 헤더명으로 찾아 안전)
-- **주의(기대치):** Links에 등록해도 대시보드 목록에는 바로 안 뜹니다. 대시보드 추세는 `DailyDelta`를 읽으므로,
-  스크래퍼가 그 영상의 **조회수 행을 `DailyDelta`에 쌓기 시작한 뒤**에 화면에 나타납니다.
-  단, 아티스트·곡명 표기는 Links에서 병합되므로 등록 즉시 반영됩니다.
-
-> 다른 탭에 넣고 싶으면 `apps-script.gs` 상단의 `TAB_NAME`을 바꾸세요.
-
-> `SHEET_WRITE_URL`이 비어 있으면 [등록]이 "URL 미설정" 안내만 띄우고, 나머지는 정상 동작합니다.
-
----
-
-## 8. 감지된 데이터 구조 (참고)
-
-`data/BNM YT View Tracker.xlsx` — 시트 4개:
-
-| 시트 | 행 수 | 사용 여부 | 열 |
-|---|---|---|---|
-| `DailyDelta` | 3,375 | **주 데이터** | date, title, video_id, delta, views, increase-rate |
-| `Latest` | 28 | 미사용 (increase-rate가 비어 있어 신뢰 불가) | 동일 |
-| `Links` | 28 | 제목 보강용만 (id 추가 창구 아님 · URL 불일치 2건이라 신뢰 안 함) | video_id, title, youtube_url |
-| `Matrix` | 28 | 미사용 (사람 눈으로 보는 wide 포맷) | 날짜별 열 |
-
-- 데이터 기간: 2026-02-07 ~ 2026-07-03 (148일)
-- 영상 30개, 정제 후 유효 포인트 3,263개 (중복 112행 제거, 스킵 0)
-- 영상별 포인트 수 2~147개 — 중간 편입된 신규 곡이 있어 정상입니다.
+- 공개 웹은 읽기 전용입니다.
+- Google Sheet 쓰기 URL과 API 키를 브라우저에 넣지 않습니다.
+- Google Sheet는 공개 읽기가 가능해야 합니다.
+- API 응답은 Vercel CDN에서 5분 캐시하고 장애 시 stale 응답을 허용합니다.
+- `data.json`은 마지막 정상 데이터를 제공하는 배포 스냅샷입니다.
+- 새 곡 등록과 관리 기능은 별도 인증된 관리자 시스템으로 분리합니다.
 
 ## 파일 구조
 
+```text
+index.html                    공개 대시보드
+index_standalone.html         내장 스냅샷 오프라인 버전
+api/dashboard.mjs             Vercel 읽기 전용 API
+lib/dashboard-data.mjs        데이터 파싱·검증·정규화
+scripts/dev-server.mjs        로컬 HTML/API 서버
+scripts/build-data.mjs        최신 스냅샷 생성
+dashboard.config.json         Google Sheet 단일 설정
+data.json                     장애 대응 스냅샷
+vercel.json                   보안 헤더 설정
+tests/data-cutoff.test.mjs    데이터 규칙 테스트
 ```
-index.html               라이브 대시보드 (🟢 시트 실시간 · 서버로 열기)
-index_standalone.html    더블클릭용 스냅샷 (📦 오프라인 공유용)
-data.json                빌드 산출 데이터 (라이브 실패 시 폴백)
-config.js                시트 URL / API 키 설정 (gitignore — 저장소엔 안 올라감)
-config.example.js        config.js 견본 (클론 후 복사해서 사용)
-scripts/build-data.mjs   엑셀 → data.json + standalone 생성
-scripts/apps-script.gs   새 곡 등록 수신용 구글 Apps Script (시트에 붙여 배포)
-data/BNM YT View Tracker.xlsx   원본 데이터 (스냅샷 빌드용)
-```
-
-> ⚠️ `config.js`는 `.gitignore`에 있어 저장소에 안 올라갑니다. 라이브 시트 URL은
-> `config.example.js`에도 넣어두면, 다른 사람이 클론했을 때 복사만으로 바로 씁니다.

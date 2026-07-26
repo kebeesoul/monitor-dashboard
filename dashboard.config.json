@@ -1,0 +1,12 @@
+{
+  "spreadsheetId": "19pyGwBOSEm62tyOi5s0_zh8CwgrsIX89GhZ7J7EQMRs",
+  "sheets": {
+    "daily": "DailyDelta",
+    "links": "Links"
+  },
+  "cache": {
+    "maxAgeSeconds": 300,
+    "staleWhileRevalidateSeconds": 3600,
+    "staleIfErrorSeconds": 86400
+  }
+}

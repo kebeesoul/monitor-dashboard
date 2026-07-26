@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BNM YouTube 음원 모니터링</title>
+<link rel="icon" href="data:,">
 <style>
 :root {
   --bg: #f5f5f7;
@@ -44,36 +45,6 @@ header {
 }
 .hd-title { font-size: 17px; font-weight: 600; letter-spacing: -0.374px; }
 .hd-meta { font-size: 12px; color: rgba(255,255,255,0.65); letter-spacing: -0.12px; }
-.hd-right { margin-left: auto; position: relative; }
-.reg-form { display: flex; flex-direction: column; gap: 6px; position: relative; }
-.reg-fields { display: flex; gap: 6px; }
-.reg-url-row { display: flex; gap: 6px; align-items: center; }
-.reg-form input {
-  background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25);
-  color: #fff; border-radius: 8px; padding: 6px 12px; font-size: 13px;
-  font-family: var(--font);
-}
-.reg-form input::placeholder { color: rgba(255,255,255,0.45); }
-.reg-form input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-#reg-artist, #reg-title { flex: 1; min-width: 0; width: 100%; }
-#id-input { flex: 1; min-width: 220px; }
-#id-btn, #reg-submit {
-  color: #fff; border: none; border-radius: 8px; flex: none;
-  padding: 6px 15px; font-size: 13px; cursor: pointer; font-family: var(--font);
-}
-#id-btn { background: rgba(255,255,255,0.16); }
-#reg-submit { background: var(--accent); }
-#id-btn:hover, #reg-submit:hover { filter: brightness(1.15); }
-#reg-submit:disabled { opacity: 0.5; cursor: default; }
-#id-msg {
-  position: absolute; top: calc(100% + 6px); right: 0; max-width: 340px;
-  background: #1d1d1f; color: #ffb4ab; font-size: 12px;
-  padding: 6px 12px; border-radius: 8px; display: none; z-index: 40;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
-}
-#id-msg.ok { color: #7ee2a8; }
-#id-msg.info { color: rgba(255,255,255,0.7); }
-
 /* ── KPI ── */
 .kpi-row {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0;
@@ -91,7 +62,7 @@ header {
 .dir-flat { color: var(--ink-3); }
 
 /* ── main grid ── */
-.main-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 12px; align-items: stretch; }
+.main-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 12px; align-items: stretch; margin-top: 12px; }
 .panel { background: var(--card); border-radius: var(--radius); padding: 16px; min-width: 0; }
 .panel h2 { font-size: 15px; font-weight: 600; letter-spacing: -0.374px; }
 
@@ -138,8 +109,14 @@ header {
 .mini-table td { text-align: right; padding: 3px 6px; border-bottom: 1px solid var(--bg); font-variant-numeric: tabular-nums; }
 
 /* ── table ── */
-.tbl-panel { margin-top: 12px; }
-.tbl-scroll { max-height: 340px; overflow-y: auto; border-radius: 8px; }
+.tbl-panel { margin-top: 0; }
+.tbl-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.tbl-head h2 { margin-right: auto; }
+.status-seg { flex-basis: 100%; overflow-x: auto; }
+.status-seg button { white-space: nowrap; }
+.status-seg [data-filter-count] { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.status-seg button.on [data-filter-count] { color: var(--ink); }
+.tbl-scroll { max-height: 340px; overflow: auto; border-radius: 8px; }
 table.perf { width: 100%; border-collapse: collapse; font-size: 13px; }
 table.perf thead th {
   position: sticky; top: 0; z-index: 2; background: var(--card);
@@ -154,18 +131,21 @@ table.perf tbody td.left { text-align: left; }
 table.perf tbody tr { cursor: pointer; }
 table.perf tbody tr:hover { background: #fafafc; }
 table.perf tbody tr.sel { background: #eef5fd; }
+table.perf tbody tr.table-empty { cursor: default; }
+table.perf tbody tr.table-empty:hover { background: transparent; }
+table.perf tbody tr.table-empty td { color: var(--ink-3); padding: 28px 10px; text-align: center; }
 .t-thumb { width: 64px; height: 36px; object-fit: cover; border-radius: 5px; display: block; background: #e8e8ed; }
+.t-artist { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
 .t-title { max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
-.t-artist { font-size: 11px; color: var(--ink-3); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .badge {
   display: inline-block; font-size: 10.5px; font-weight: 600; border-radius: 980px;
   padding: 1px 8px; margin-left: 4px; letter-spacing: 0;
 }
 .b-accel { background: #fdeeea; color: #c2410c; }
 .b-decel { background: #eef0f3; color: #475569; }
-.b-stall { background: #f1f1f4; color: #6b7280; }
 .b-spike { background: #fdf3d7; color: #92600a; }
 .b-new   { background: #e7f1fc; color: #0b5cad; }
+.b-missing { background: #f1f1f4; color: #6b7280; }
 .spark path { fill: none; stroke: var(--accent); stroke-width: 1.5; }
 .spark { display: block; }
 
@@ -177,8 +157,6 @@ footer { margin-top: 14px; font-size: 11px; color: var(--ink-3); text-align: cen
 }
 @media (max-width: 640px) {
   .kpi-row { grid-template-columns: 1fr; }
-  #id-input { min-width: 120px; }
-  .hd-right { width: 100%; }
 }
 </style>
 </head>
@@ -189,69 +167,42 @@ footer { margin-top: 14px; font-size: 11px; color: var(--ink-3); text-align: cen
       <div class="hd-title">BNM YouTube 음원 모니터링</div>
       <div class="hd-meta" id="hd-meta">데이터 로딩 중…</div>
     </div>
-    <div class="hd-right">
-      <div class="reg-form">
-        <div class="reg-fields">
-          <input id="reg-artist" type="text" placeholder="아티스트" spellcheck="false">
-          <input id="reg-title" type="text" placeholder="곡명" spellcheck="false">
-        </div>
-        <div class="reg-url-row">
-          <input id="id-input" type="text" placeholder="유튜브 URL 붙여넣기" spellcheck="false">
-          <button id="id-btn">조회</button>
-          <button id="reg-submit">등록</button>
-        </div>
-        <div id="id-msg"></div>
-      </div>
-    </div>
   </div>
 </header>
 
 <div class="wrap">
   <div class="kpi-row" id="kpi-row"></div>
 
-  <div class="main-grid">
-    <div class="panel">
-      <div class="chart-head">
-        <h2>조회수 추세</h2>
-        <div class="seg" id="seg-period">
-          <button data-p="7">7일</button>
-          <button data-p="30" class="on">30일</button>
-          <button data-p="all">전체</button>
-        </div>
-        <div class="seg" id="seg-view">
-          <button data-v="cum" class="on">누적 조회수</button>
-          <button data-v="delta">일일 증가분</button>
-        </div>
-        <div class="seg" id="seg-num">
-          <button data-n="abbr" class="on">축약 (66.4M)</button>
-          <button data-n="full">전체 자리수</button>
-        </div>
-      </div>
-      <div class="legend" id="legend"></div>
-      <div id="chart-box">
-        <svg id="chart" height="360"></svg>
-        <div id="tooltip"></div>
-      </div>
-    </div>
-
-    <div class="panel" id="drill">
-      <div class="d-empty">영상을 선택하면 상세 분석이 표시됩니다.<br>(테이블 행 클릭 또는 상단 video id 조회)</div>
-    </div>
-  </div>
-
   <div class="panel tbl-panel">
-    <h2 style="margin-bottom:8px">영상별 성과 <span style="font-weight:400;color:var(--ink-3);font-size:12px" id="tbl-count"></span></h2>
+    <div class="tbl-head">
+      <h2>영상별 성과 <span style="font-weight:400;color:var(--ink-3);font-size:12px" id="tbl-count"></span></h2>
+      <div class="seg" id="seg-growth" aria-label="증가수 조회 기간">
+        <button data-w="1" class="on" aria-pressed="true">최근 1일</button>
+        <button data-w="7" aria-pressed="false">최근 7일</button>
+        <button data-w="30" aria-pressed="false">최근 30일</button>
+      </div>
+      <div class="seg status-seg" id="seg-status" aria-label="영상 상태 필터">
+        <button data-status="all" class="on" aria-pressed="true">전체 <span data-filter-count="all">0</span></button>
+        <button data-status="spike" aria-pressed="false">급등 <span data-filter-count="spike">0</span></button>
+        <button data-status="accelerating" aria-pressed="false">가속 <span data-filter-count="accelerating">0</span></button>
+        <button data-status="decelerating" aria-pressed="false">감속 <span data-filter-count="decelerating">0</span></button>
+        <button data-status="missing" aria-pressed="false">수집 누락 <span data-filter-count="missing">0</span></button>
+        <button data-status="new" aria-pressed="false">신규 <span data-filter-count="new">0</span></button>
+      </div>
+    </div>
     <div class="tbl-scroll">
       <table class="perf">
         <thead>
           <tr>
             <th class="left" style="cursor:default"></th>
-            <th class="left" data-sort="title">제목</th>
-            <th data-sort="views">현재 조회수</th>
-            <th data-sort="d7">최근 7일 증가</th>
-            <th data-sort="rate">최근 증가율</th>
+            <th class="left" data-sort="artist" tabindex="0">아티스트</th>
+            <th class="left" data-sort="title" tabindex="0">제목</th>
+            <th data-sort="uploadDate" tabindex="0">업로드일</th>
+            <th data-sort="views" tabindex="0">현재 조회수</th>
+            <th id="growth-col" data-sort="gain" tabindex="0">최근 1일 증가</th>
+            <th data-sort="rate" tabindex="0">최근 증가율</th>
             <th style="cursor:default">추세 (30일)</th>
-            <th data-sort="points">포인트</th>
+            <th data-sort="points" tabindex="0">수집기간</th>
             <th class="left" style="cursor:default">상태</th>
           </tr>
         </thead>
@@ -260,22 +211,47 @@ footer { margin-top: 14px; font-size: 11px; color: var(--ink-3); text-align: cen
     </div>
   </div>
 
+  <div class="main-grid">
+    <div class="panel">
+      <div class="chart-head">
+        <h2>조회수 추세</h2>
+        <div class="seg" id="seg-period">
+          <button data-p="7" class="on" aria-pressed="true">7일</button>
+          <button data-p="30" aria-pressed="false">30일</button>
+          <button data-p="all" aria-pressed="false">전체</button>
+        </div>
+        <div class="seg" id="seg-view">
+          <button data-v="cum" aria-pressed="false">누적 조회수</button>
+          <button data-v="delta" class="on" aria-pressed="true">일일 증가분</button>
+        </div>
+        <div class="seg" id="seg-num">
+          <button data-n="abbr" aria-pressed="false">축약 (66.4M)</button>
+          <button data-n="full" class="on" aria-pressed="true">전체 자리수</button>
+        </div>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div id="chart-box">
+        <svg id="chart" height="360" role="img" aria-label="선택된 영상의 조회수 추세 차트"></svg>
+        <div id="tooltip"></div>
+      </div>
+    </div>
+
+    <div class="panel" id="drill">
+      <div class="d-empty">영상을 선택하면 상세 분석이 표시됩니다.<br>(테이블 행 클릭)</div>
+    </div>
+  </div>
+
   <footer id="foot"></footer>
 </div>
 
-<script src="config.js"></script>
+<script id="embedded-data-placeholder"></script>
 <script>
 'use strict';
 /* ═══════════════ 유틸 ═══════════════ */
 const $ = s => document.querySelector(s);
-const CFG = window.DASH_CONFIG || { SHEET_CSV_URL: '', YT_API_KEY: '' };
-// config에 실수로 섞인 공백·줄바꿈이 URL을 깨지 않도록 방어적으로 정리
-['SHEET_CSV_URL', 'SHEET_WRITE_URL', 'YT_API_KEY'].forEach(k => {
-  if (typeof CFG[k] === 'string') CFG[k] = CFG[k].trim();
-});
 const PALETTE = ['#0071e3','#d97706','#059669','#dc2626','#7c3aed','#0891b2','#be185d','#4d7c0f','#b45309','#475569'];
 
-let numMode = 'abbr'; // 'abbr' | 'full'
+let numMode = 'full'; // 'abbr' | 'full'
 function fmtFull(n) { return Math.round(n).toLocaleString('ko-KR'); }
 function fmtAbbr(n) {
   const a = Math.abs(n), s = n < 0 ? '-' : '';
@@ -293,58 +269,14 @@ function dirHtml(pct, invert) {
   const arrow = up ? '▲' : '▼';
   return `<span class="${cls}">${arrow} ${Math.abs(pct).toFixed(1)}%</span>`;
 }
-function dayDiff(a, b) { return Math.round((new Date(b) - new Date(a)) / 86400000); }
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 /* ═══════════════ 파생 지표 (§6) ═══════════════ */
 function windowSum(hist, endDate, days) {
-  // endDate 기준 최근 days일(포함) 안의 delta 합 — 날짜 기반이라 불규칙 스크랩에도 안전
   const from = new Date(new Date(endDate) - (days - 1) * 86400000).toISOString().slice(0,10);
   let sum = 0;
   for (const p of hist) if (p.date >= from && p.date <= endDate) sum += p.delta;
   return sum;
-}
-function median(arr) {
-  if (!arr.length) return 0;
-  const s = [...arr].sort((a,b)=>a-b);
-  const m = s.length >> 1;
-  return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2;
-}
-function computeMetrics(v, globalEnd) {
-  const h = v.history;
-  const n = h.length;
-  const end = h[n-1].date;
-  const spanDays = Math.max(1, dayDiff(h[0].date, end));
-  const totalGain = h[n-1].views - h[0].views;
-  const overallDaily = totalGain / spanDays;
-
-  const d7 = windowSum(h, end, 7);
-  const prev7End = new Date(new Date(end) - 7 * 86400000).toISOString().slice(0,10);
-  const d7prev = windowSum(h, prev7End, 7);
-  const d30 = windowSum(h, end, 30);
-  const lastRate = h[n-1].rate;
-
-  // 스파이크: delta가 중앙값의 2배 이상 (중앙값>0일 때만)
-  const deltas = h.slice(1).map(p => p.delta);
-  const med = median(deltas);
-  let spikeDate = null;
-  if (med > 0) {
-    for (let i = h.length - 1; i >= 1; i--) {
-      if (h[i].delta >= med * 2 && h[i].delta > 0) { spikeDate = h[i].date; break; }
-    }
-  }
-
-  const badges = [];
-  if (n < 30) {
-    badges.push({ cls:'b-new', label:'신규', tip:'데이터 30개 미만 — 추세 판단 보류' });
-  } else {
-    if (d7prev > 0 && d7 >= d7prev * 1.2) badges.push({ cls:'b-accel', label:'가속🔥', tip:'최근 7일이 직전 7일보다 20%↑' });
-    else if (d7prev > 0 && d7 <= d7prev * 0.8) badges.push({ cls:'b-decel', label:'감속', tip:'최근 7일이 직전 7일보다 20%↓' });
-    if (overallDaily > 0 && (d7 / 7) < overallDaily * 0.3) badges.push({ cls:'b-stall', label:'정체', tip:'최근 7일 증가폭이 전체 평균의 30% 미만' });
-  }
-  if (spikeDate) badges.push({ cls:'b-spike', label:'스파이크', tip:'평소(중앙값)의 2배 이상 급등: ' + spikeDate, date: spikeDate });
-
-  return { d7, d7prev, d30, overallDaily, lastRate, badges, spikeDate, points: n, end };
 }
 
 /* ═══════════════ SVG 차트 렌더러 ═══════════════ */
@@ -467,14 +399,21 @@ function sparkline(hist, w, h) {
 
 /* ═══════════════ 상태 ═══════════════ */
 let DATA = null;
-let METRICS = new Map();
 let selectedIds = [];       // 차트에 표시 중인 영상들
 let highlightId = null;     // 하이라이트/드릴다운 대상
-let period = '30';
-let viewMode = 'cum';
-let sortKey = 'views', sortDir = -1;
-let liveStat = null;        // C옵션 실시간 값 {id, views}
-let dataSource = 'local';   // 'sheet' | 'embedded' | 'local' — 헤더 표시용
+let period = '7';
+let viewMode = 'delta';
+let tableWindow = 1;
+let tableFilter = 'all';
+let sortKey = 'gain', sortDir = -1;
+let dataSource = 'local';   // 'api' | 'snapshot' | 'embedded' | 'local'
+const ALERT_META = {
+  missing: { cls:'b-missing', label:'수집 누락', tip:'전체 최신 날짜에 해당 영상의 데이터가 없습니다' },
+  new: { cls:'b-new', label:'신규', tip:'데이터 8개 미만 — 추세 이상 판단 보류' },
+  spike: { cls:'b-spike', label:'급등', tip:'최신 증가수가 직전 최대 7개 증가수 중앙값의 2배 이상' },
+  accelerating: { cls:'b-accel', label:'가속', tip:'최근 7일이 직전 7일보다 20% 이상 증가' },
+  decelerating: { cls:'b-decel', label:'감속', tip:'최근 7일이 직전 7일보다 20% 이상 감소' },
+};
 
 function colorOf(id) {
   const i = selectedIds.indexOf(id);
@@ -485,17 +424,22 @@ function colorOf(id) {
 function renderKPIs() {
   const vs = DATA.videos;
   const end = DATA.dateRange.end;
+  const previous7End = new Date(new Date(end) - 7 * 86400000).toISOString().slice(0,10);
 
   let d7all = 0, d7prevAll = 0;
-  for (const v of vs) { const m = METRICS.get(v.id); d7all += m.d7; d7prevAll += m.d7prev; }
+  for (const v of vs) {
+    d7all += v.monitoring.growth[7].increase;
+    d7prevAll += windowSum(v.history, previous7End, 7);
+  }
   const d7pct = d7prevAll > 0 ? (d7all - d7prevAll) / d7prevAll * 100 : 0;
 
-  let top = null;
-  for (const v of vs) { const m = METRICS.get(v.id); if (!top || m.d7 > METRICS.get(top.id).d7) top = v; }
-  const topM = METRICS.get(top.id);
-  const topPct = topM.d7prev > 0 ? (topM.d7 - topM.d7prev) / topM.d7prev * 100 : 0;
-  const topLabel = top.artist ? `${top.artist} – ${top.title}` : top.title;
-  const newCount = vs.filter(v => v.history.length < 30).length;
+  const top = vs.reduce((best, video) => (
+    video.monitoring.growth[7].increase > best.monitoring.growth[7].increase ? video : best
+  ));
+  const topD7 = top.monitoring.growth[7].increase;
+  const topD7prev = windowSum(top.history, previous7End, 7);
+  const topPct = topD7prev > 0 ? (topD7 - topD7prev) / topD7prev * 100 : 0;
+  const newCount = vs.filter(v => v.monitoring.alerts.includes('new')).length;
 
   $('#kpi-row').innerHTML = `
     <div class="kpi"><div class="k-label">추적 영상 수</div>
@@ -505,8 +449,8 @@ function renderKPIs() {
       <div class="k-value">+${fmt(d7all)}</div>
       <div class="k-sub">${dirHtml(d7pct)} 직전 7일 대비</div></div>
     <div class="kpi"><div class="k-label">최고 성장 영상 (7일)</div>
-      <div class="k-value small" title="${esc(topLabel)}">${esc(topLabel.length > 22 ? topLabel.slice(0,22) + '…' : topLabel)}</div>
-      <div class="k-sub">+${fmt(topM.d7)} · ${dirHtml(topPct)}</div></div>
+      <div class="k-value small" title="${esc(top.title)}">${esc(top.title.length > 22 ? top.title.slice(0,22) + '…' : top.title)}</div>
+      <div class="k-sub">+${fmt(topD7)} · ${dirHtml(topPct)}</div></div>
     <div class="kpi"><div class="k-label">최신 스크랩 날짜</div>
       <div class="k-value small">${end}</div>
       <div class="k-sub">데이터 ${DATA.videos.reduce((a,v)=>a+v.history.length,0).toLocaleString()}포인트</div></div>`;
@@ -526,11 +470,6 @@ function renderChart() {
     let pts = v.history.filter(p => p.date >= from);
     if (viewMode === 'delta') pts = pts.map(p => ({ date: p.date, value: p.delta }));
     else pts = pts.map(p => ({ date: p.date, value: p.views }));
-    // C옵션 실시간 값: 누적 뷰에만 임시 포인트로 덧붙임
-    if (liveStat && liveStat.id === id && viewMode === 'cum') {
-      const today = new Date().toISOString().slice(0,10);
-      if (!pts.length || pts[pts.length-1].date < today) pts = [...pts, { date: today, value: liveStat.views }];
-    }
     return { id, name: v.title, color: PALETTE[i % PALETTE.length], points: pts };
   }).filter(Boolean);
 
@@ -565,44 +504,79 @@ function toggleSeries(id) {
   renderChart(); renderTable();
 }
 
-function badgeHtml(m) {
-  return m.badges.map(b => `<span class="badge ${b.cls}" title="${esc(b.tip)}">${b.label}</span>`).join('');
+function badgeHtml(v) {
+  return v.monitoring.alerts.map(code => {
+    const alert = ALERT_META[code];
+    return alert ? `<span class="badge ${alert.cls}" title="${esc(alert.tip)}">${alert.label}</span>` : '';
+  }).join('');
+}
+
+function selectedGrowth(v) {
+  return v.monitoring.growth[tableWindow];
 }
 
 function tableRows() {
   const rows = DATA.videos.map(v => {
-    const m = METRICS.get(v.id);
-    return { v, m, title: v.title, views: v.currentViews, d7: m.d7, rate: m.lastRate, points: m.points };
-  });
+    const growth = selectedGrowth(v);
+    return {
+      v,
+      growth,
+      artist: v.artist,
+      title: v.title,
+      uploadDate: v.uploadDate,
+      views: v.currentViews,
+      gain: growth.increase,
+      rate: v.monitoring.latestRate,
+      points: v.history.length,
+    };
+  }).filter(({ v }) => tableFilter === 'all' || v.monitoring.alerts.includes(tableFilter));
   rows.sort((a, b) => {
     const x = a[sortKey], y = b[sortKey];
     if (typeof x === 'string') return sortDir * x.localeCompare(y, 'ko');
-    return sortDir * (x - y);
+    return sortDir * ((x ?? -Infinity) - (y ?? -Infinity));
   });
   return rows;
 }
 
 function renderTable() {
   const rows = tableRows();
-  $('#tbl-count').textContent = `총 ${rows.length}개 · 행 클릭 시 차트 하이라이트 + 상세`;
-  $('#tbl-body').innerHTML = rows.map(({ v, m }) => `
-    <tr data-id="${v.id}" class="${v.id === highlightId ? 'sel' : ''}">
+  const maxObserved = Math.max(0, ...rows.map(({ growth }) => growth.observedDays));
+  $('#growth-col').textContent = `최근 ${tableWindow}일 증가`;
+  $('#tbl-count').textContent = `표시 ${rows.length}/${DATA.videos.length}개 · 실제 관측 최대 ${maxObserved}일 · 행 클릭 시 차트 하이라이트 + 상세`;
+  document.querySelectorAll('[data-filter-count]').forEach(element => {
+    const status = element.dataset.filterCount;
+    element.textContent = status === 'all'
+      ? DATA.videos.length
+      : DATA.videos.filter(v => v.monitoring.alerts.includes(status)).length;
+  });
+  $('#tbl-body').innerHTML = rows.length ? rows.map(({ v, growth }) => `
+    <tr data-id="${v.id}" class="${v.id === highlightId ? 'sel' : ''}" tabindex="0">
       <td class="left"><img class="t-thumb" src="${v.thumb}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"></td>
-      <td class="left"><div class="t-title" title="${esc(v.title)}">${esc(v.title)}</div>${v.artist ? `<div class="t-artist">${esc(v.artist)}</div>` : ''}</td>
+      <td class="left"><div class="t-artist" title="${esc(v.artist)}">${esc(v.artist)}</div></td>
+      <td class="left"><div class="t-title" title="${esc(v.title)}">${esc(v.title)}</div></td>
+      <td>${v.uploadDate}</td>
       <td>${fmt(v.currentViews)}</td>
-      <td class="${m.d7 >= 0 ? '' : 'dir-down'}">${sign(m.d7)}${fmt(m.d7)}</td>
-      <td>${m.lastRate >= 0 ? '' : '-'}${Math.abs(m.lastRate).toFixed(2)}%</td>
+      <td class="${growth.increase < 0 ? 'dir-down' : ''}" title="최근 ${tableWindow}일 중 실제 관측 ${growth.observedDays}일">
+        ${sign(growth.increase)}${fmt(growth.increase)}</td>
+      <td>${v.monitoring.latestRate == null ? '—' : `${v.monitoring.latestRate > 0 ? '+' : ''}${v.monitoring.latestRate.toFixed(2)}%`}</td>
       <td>${sparkline(v.history, 90, 26)}</td>
-      <td>${m.points}</td>
-      <td class="left">${badgeHtml(m) || '<span style="color:var(--ink-3)">—</span>'}</td>
-    </tr>`).join('');
-  $('#tbl-body').querySelectorAll('tr').forEach(tr => {
+      <td title="실제 수집된 날짜 ${v.history.length}일">${v.history.length}일</td>
+      <td class="left">${badgeHtml(v) || '<span style="color:var(--ink-3)">—</span>'}</td>
+    </tr>`).join('') : '<tr class="table-empty"><td colspan="10">해당 상태의 영상이 없습니다</td></tr>';
+  $('#tbl-body').querySelectorAll('tr[data-id]').forEach(tr => {
     tr.onclick = () => setHighlight(tr.dataset.id, true);
+    tr.onkeydown = event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        setHighlight(tr.dataset.id, true);
+      }
+    };
   });
   // sort indicators
   document.querySelectorAll('th[data-sort]').forEach(th => {
     const base = th.textContent.replace(/[▲▼]\s*$/, '').trim();
     th.innerHTML = base + (th.dataset.sort === sortKey ? ` <span class="arr">${sortDir < 0 ? '▼' : '▲'}</span>` : '');
+    th.setAttribute('aria-sort', th.dataset.sort === sortKey ? (sortDir < 0 ? 'descending' : 'ascending') : 'none');
   });
 }
 
@@ -612,44 +586,45 @@ function setHighlight(id, addToChart) {
   renderChart(); renderTable(); renderDrill();
 }
 
-function growthSummary(v, m) {
+function growthSummary(v) {
+  const monitoring = v.monitoring;
+  const d7 = monitoring.growth[7];
+  const d30 = monitoring.growth[30];
   const parts = [];
-  if (m.d30 !== 0) parts.push(`지난 30일 ${sign(m.d30)}${fmtAbbr(m.d30)}`);
-  const recent7Daily = m.d7 / 7;
-  parts.push(`일평균 ${sign(Math.round(recent7Daily))}${fmtFull(Math.round(recent7Daily))} (최근 7일 기준)`);
-  if (v.history.length >= 30) {
-    if (m.d7prev > 0 && m.d7 >= m.d7prev * 1.2) parts.push('최근 7일 가속 중 🔥');
-    else if (m.d7prev > 0 && m.d7 <= m.d7prev * 0.8) parts.push('최근 7일 감속');
-    else parts.push('추세 유지');
+  if (d30.increase !== 0) parts.push(`지난 30일 ${sign(d30.increase)}${fmtAbbr(d30.increase)} (관측 ${d30.observedDays}일)`);
+  const recent7Daily = d7.observedDays ? d7.increase / d7.observedDays : 0;
+  parts.push(`일평균 ${sign(Math.round(recent7Daily))}${fmtFull(Math.round(recent7Daily))} (최근 7일, 관측 ${d7.observedDays}일)`);
+  if (monitoring.alerts.includes('new')) {
+    parts.push('신규 편입 — 추세 이상 판단 보류');
   } else {
-    parts.push('신규 편입 — 추세 판단 보류');
+    if (monitoring.alerts.includes('accelerating')) parts.push('최근 7일 가속 중');
+    else if (monitoring.alerts.includes('decelerating')) parts.push('최근 7일 감속');
+    else parts.push('추세 유지');
   }
-  if (m.spikeDate) parts.push(`${m.spikeDate} 스파이크 감지`);
+  if (monitoring.alerts.includes('spike')) parts.push('최신 증가수 급등 감지');
+  if (monitoring.alerts.includes('missing')) parts.push(`${monitoring.asOf} 수집 누락`);
   return parts.join(' / ');
 }
 
 function renderDrill() {
   const box = $('#drill');
   if (!highlightId) {
-    box.innerHTML = '<div class="d-empty">영상을 선택하면 상세 분석이 표시됩니다.<br>(테이블 행 클릭 또는 상단 video id 조회)</div>';
+    box.innerHTML = '<div class="d-empty">영상을 선택하면 상세 분석이 표시됩니다.<br>(테이블 행 클릭)</div>';
     return;
   }
   const v = DATA.videos.find(x => x.id === highlightId);
   if (!v) return;
-  const m = METRICS.get(v.id);
   const recent = v.history.slice(-14).reverse();
   const single = v.history.length < 2;
   box.innerHTML = `
     <a href="${v.url}" target="_blank" rel="noopener" title="유튜브에서 열기">
       <img class="d-thumb" src="${v.thumb}" alt="${esc(v.title)}" onerror="this.style.display='none'"></a>
     <div class="d-title"><a href="${v.url}" target="_blank" rel="noopener">${esc(v.title)} ↗</a>
-      ${badgeHtml(m)}</div>
-    ${v.artist ? `<div style="font-size:12px;color:var(--ink-3);margin-top:-4px">${esc(v.artist)}</div>` : ''}
-    <div style="font-size:13px">현재 <b>${fmtFull(v.currentViews)}</b>회
-      ${liveStat && liveStat.id === v.id ? `<span class="d-live"> · 실시간 ${fmtFull(liveStat.views)}회 (YouTube API)</span>` : ''}</div>
+      ${badgeHtml(v)}</div>
+    <div style="font-size:13px">현재 <b>${fmtFull(v.currentViews)}</b>회</div>
     ${single
       ? '<div class="d-summary">데이터 포인트가 1개뿐이라 추세를 계산할 수 없습니다. (신규)</div>'
-      : `<div class="d-summary">${esc(growthSummary(v, m))}</div>
+      : `<div class="d-summary">${esc(growthSummary(v))}</div>
          <svg id="drill-chart" height="140" style="width:100%"></svg>`}
     <div style="font-size:12px;font-weight:600;color:var(--ink-3)">최근 14일</div>
     <div style="max-height:170px;overflow-y:auto">
@@ -663,289 +638,120 @@ function renderDrill() {
   }
 }
 
-/* ═══════════════ 유튜브 URL → id 조회 / 새 곡 등록 ═══════════════ */
-// 지원 형태: youtu.be/ID, watch?v=ID, music.youtube.com, /shorts/ID, /embed/ID, &list=…, 순수 11자 id
-function extractVideoId(input) {
-  const s = (input || '').trim();
-  if (!s) return null;
-  if (/^[A-Za-z0-9_-]{11}$/.test(s)) return s; // 순수 id 붙여넣기도 허용
-  let m;
-  if ((m = s.match(/[?&]v=([A-Za-z0-9_-]{11})/))) return m[1];
-  if ((m = s.match(/youtu\.be\/([A-Za-z0-9_-]{11})/))) return m[1];
-  if ((m = s.match(/\/(?:shorts|embed|live)\/([A-Za-z0-9_-]{11})/))) return m[1];
-  if ((m = s.match(/([A-Za-z0-9_-]{11})/))) return m[1]; // 마지막 폴백: 문자열 내 11자 토큰
-  return null;
-}
-
-function showIdMsg(text, ok, variant) {
-  const el = $('#id-msg');
-  el.textContent = text;
-  el.className = variant || (ok ? 'ok' : '');
-  el.style.display = 'block';
-  clearTimeout(showIdMsg._t);
-  showIdMsg._t = setTimeout(() => { el.style.display = 'none'; }, 4000);
-}
-
-// [조회] URL로 기존 영상 찾기. 미등록이면 아티스트·곡명 자동 채움 안내.
-async function lookupId() {
-  const raw = $('#id-input').value;
-  const id = extractVideoId(raw);
-  if (!id) { showIdMsg('유튜브 URL에서 영상 id를 찾지 못했습니다'); return; }
-  const v = DATA.videos.find(x => x.id === id);
-  if (!v) {
-    showIdMsg('미등록 영상입니다 — 아티스트·곡명 입력 후 [등록]하세요', false, 'info');
-    await autofillMeta(id); // YT 키 있으면 아티스트·곡명 칸 자동 채움
-    return;
+/* ═══════════════ 데이터 로드 ═══════════════ */
+function validateDashboardPayload(data) {
+  if (!data || !Array.isArray(data.videos) || !data.videos.length) {
+    throw new Error('대시보드 데이터가 비어 있습니다');
   }
-  liveStat = null;
-  if (CFG.YT_API_KEY) {
-    try {
-      const r = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${encodeURIComponent(id)}&key=${encodeURIComponent(CFG.YT_API_KEY)}`);
-      if (r.ok) {
-        const j = await r.json();
-        const s = j.items && j.items[0] && j.items[0].statistics;
-        if (s && s.viewCount) liveStat = { id, views: +s.viewCount };
-      }
-    } catch (e) { /* 실시간 조회 실패 — 로컬 데이터로 계속 */ }
+  if (!data.dateRange?.start || !data.dateRange?.end) {
+    throw new Error('대시보드 날짜 범위가 없습니다');
   }
-  setHighlight(id, true);
+  if (data.videos.some(video => (
+    !String(video.artist || '').trim()
+    || !/^\d{4}-\d{2}-\d{2}$/.test(video.uploadDate)
+    || video.monitoring?.asOf !== data.dateRange.end
+  ))) {
+    throw new Error('영상 모니터링 지표가 올바르지 않습니다');
+  }
+  return data;
 }
 
-// YT API 키가 있을 때 채널명→아티스트, 제목→곡명 자동 채움 (비었을 때만)
-async function autofillMeta(id) {
-  if (!CFG.YT_API_KEY) return;
+async function loadData() {
+  if (window.EMBEDDED_DATA) {
+    dataSource = 'embedded';
+    return validateDashboardPayload(window.EMBEDDED_DATA);
+  }
+
   try {
-    const r = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${encodeURIComponent(id)}&key=${encodeURIComponent(CFG.YT_API_KEY)}`);
-    const j = await r.json();
-    const sn = j.items && j.items[0] && j.items[0].snippet;
-    if (!sn) return;
-    if (!$('#reg-artist').value.trim())
-      $('#reg-artist').value = (sn.channelTitle || '').replace(/\s*-\s*Topic$/i, '').trim();
-    if (!$('#reg-title').value.trim())
-      $('#reg-title').value = (sn.title || '').trim();
-    showIdMsg('자동 채움 완료 — 확인·수정 후 [등록]하세요', true, 'info');
-  } catch (e) { /* 자동 조회 실패 — 수동 입력 */ }
-}
+    const response = await fetch('/api/dashboard', { cache: 'no-store' });
+    if (!response.ok) throw new Error('대시보드 API 응답 오류: ' + response.status);
+    const data = validateDashboardPayload(await response.json());
+    dataSource = data.source === 'sheet' ? 'api' : 'snapshot';
+    return data;
+  } catch (error) {
+    console.warn('대시보드 API 실패 — 배포 스냅샷으로 대체합니다:', error.message);
+  }
 
-// [등록] 아티스트·곡명·URL → Links 시트에 기록
-async function submitRegister() {
-  const id = extractVideoId($('#id-input').value);
-  const artist = $('#reg-artist').value.trim();
-  const title = $('#reg-title').value.trim();
-  if (!id) { showIdMsg('유튜브 URL을 먼저 입력하세요'); return; }
-  if (!artist || !title) { showIdMsg('아티스트와 곡명을 모두 입력하세요'); return; }
-  if (!CFG.SHEET_WRITE_URL) { showIdMsg('시트 쓰기 URL(config.js의 SHEET_WRITE_URL)이 아직 설정되지 않았습니다'); return; }
-
-  const payload = { video_id: id, artist, title, youtube_url: `https://www.youtube.com/watch?v=${id}` };
-  const btn = $('#reg-submit');
-  btn.disabled = true; showIdMsg('시트에 등록 중…', false, 'info');
-  const clearFields = () => { $('#id-input').value = ''; $('#reg-artist').value = ''; $('#reg-title').value = ''; };
-  // 25초 넘게 응답이 없으면 중단 (배포 오류 시 무한 대기 방지)
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 25000);
-  try {
-    // Apps Script 웹앱은 프리플라이트를 안 받으므로 text/plain 단순요청으로 전송
-    const r = await fetch(CFG.SHEET_WRITE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload),
-      redirect: 'follow',
-      signal: ctrl.signal,
-    });
-    const bodyText = await r.text();
-    let res = null;
-    try { res = JSON.parse(bodyText); } catch (_) { /* JSON 아님 = 구글 오류/로그인 페이지 */ }
-    if (res && res.ok === true) {
-      showIdMsg(`✅ ${artist} – ${title} 등록 완료`, true);
-      clearFields();
-    } else if (res && res.reason === 'duplicate') {
-      showIdMsg('이미 시트에 등록된 영상입니다', false, 'info');
-    } else if (res && res.reason) {
-      showIdMsg('등록 거부됨: ' + res.reason);
-    } else {
-      // JSON이 아니면 배포 접근 문제 — 응답을 못 읽었으니 성공으로 오인하지 않는다
-      showIdMsg('등록 응답을 확인하지 못했습니다 — 웹앱 배포(액세스: 모든 사용자)를 확인하세요');
-      console.warn('SHEET_WRITE_URL 응답(JSON 아님):', bodyText.slice(0, 200));
-    }
-  } catch (e) {
-    if (e.name === 'AbortError') {
-      showIdMsg('등록 시간 초과 — 웹앱 배포 상태를 확인하세요');
-    } else {
-      showIdMsg('등록 실패(네트워크/CORS): ' + e.message);
-    }
-  } finally {
-    clearTimeout(timer);
-    btn.disabled = false;
-  }
-}
-
-/* ═══════════════ B옵션: 구글시트 CSV ═══════════════ */
-function parseCsv(text) {
-  // 간단 CSV 파서 (따옴표 필드 지원)
-  const rows = [];
-  let row = [], field = '', q = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (q) {
-      if (c === '"') { if (text[i+1] === '"') { field += '"'; i++; } else q = false; }
-      else field += c;
-    } else if (c === '"') q = true;
-    else if (c === ',') { row.push(field); field = ''; }
-    else if (c === '\n' || c === '\r') {
-      if (field || row.length) { row.push(field); rows.push(row); row = []; field = ''; }
-      if (c === '\r' && text[i+1] === '\n') i++;
-    } else field += c;
-  }
-  if (field || row.length) { row.push(field); rows.push(row); }
-  return rows;
-}
-// Links CSV → id별 {artist, title} 맵 (헤더 이름으로 열을 찾아 빈 열/재배치에 안전)
-function parseLinksMap(rows) {
-  const map = new Map();
-  if (!rows || !rows.length) return map;
-  const head = rows[0].map(h => h.trim().toLowerCase());
-  const iId = head.indexOf('video_id'), iArtist = head.indexOf('artist'), iTitle = head.indexOf('title');
-  if (iId < 0) return map;
-  for (const r of rows.slice(1)) {
-    const id = (r[iId] || '').trim();
-    if (!id) continue;
-    map.set(id, {
-      artist: iArtist >= 0 ? (r[iArtist] || '').trim() : '',
-      title: iTitle >= 0 ? (r[iTitle] || '').trim() : '',
-    });
-  }
-  return map;
-}
-
-function buildFromSheetRows(rows, linksMap) {
-  // 헤더: date,title,video_id,delta,views,increase-rate — build 스크립트와 동일한 §2 정제
-  const links = linksMap || new Map();
-  const head = rows[0].map(h => h.trim().toLowerCase());
-  const ix = k => head.indexOf(k);
-  const iDate = ix('date'), iTitle = ix('title'), iId = ix('video_id'), iViews = ix('views');
-  if (iDate < 0 || iId < 0 || iViews < 0) throw new Error('CSV 열 구조가 예상과 다릅니다');
-  const byKey = new Map();
-  for (const r of rows.slice(1)) {
-    const rawDate = (r[iDate] || '').trim();
-    const day = rawDate.slice(0, 10).replace(/[./]/g, '-');
-    const views = Number(String(r[iViews]).replace(/,/g, ''));
-    const id = (r[iId] || '').trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !id || !Number.isFinite(views)) continue;
-    const k = id + '|' + day;
-    const prev = byKey.get(k);
-    if (!prev || views > prev.views)
-      byKey.set(k, { id, day, views, title: (r[iTitle] || '').trim() });
-  }
-  const byVideo = new Map();
-  for (const p of byKey.values()) {
-    if (!byVideo.has(p.id)) byVideo.set(p.id, []);
-    byVideo.get(p.id).push(p);
-  }
-  let minDay = null, maxDay = null;
-  const videos = [];
-  for (const [id, pts] of byVideo) {
-    pts.sort((a, b) => a.day.localeCompare(b.day));
-    const history = pts.map((p, i) => {
-      const prev = i > 0 ? pts[i-1] : null;
-      const delta = prev ? p.views - prev.views : 0;
-      const rate = prev && prev.views > 0 ? Math.round(delta / prev.views * 10000) / 100 : 0;
-      return { date: p.day, views: p.views, delta, rate };
-    });
-    if (!minDay || history[0].date < minDay) minDay = history[0].date;
-    if (!maxDay || history[history.length-1].date > maxDay) maxDay = history[history.length-1].date;
-    const meta = links.get(id) || {};
-    // 제목: Links 우선(사람이 정리한 표기) → DailyDelta 폴백
-    const title = meta.title || [...pts].reverse().find(p => p.title)?.title || id;
-    videos.push({
-      id, title,
-      artist: meta.artist || '',
-      url: `https://www.youtube.com/watch?v=${id}`,
-      thumb: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
-      currentViews: history[history.length-1].views,
-      history,
-    });
-  }
-  videos.sort((a, b) => b.currentViews - a.currentViews);
-  return { generatedAt: new Date().toISOString(), dateRange: { start: minDay, end: maxDay }, videos };
+  const response = await fetch('data.json', { cache: 'no-store' });
+  if (!response.ok) throw new Error('data.json 로드 실패');
+  dataSource = 'local';
+  return validateDashboardPayload(await response.json());
 }
 
 /* ═══════════════ 초기화 ═══════════════ */
-async function loadData() {
-  // B옵션: 시트 URL이 있으면 우선 시도, 실패 시 로컬로 폴백
-  if (CFG.SHEET_CSV_URL) {
-    try {
-      // 캐시 무효화: 브라우저/구글 캐시가 옛 CSV를 주지 않도록 타임스탬프 부착
-      const bust = () => (CFG.SHEET_CSV_URL.includes('?') ? '&' : '?') + '_ts=' + Date.now();
-      // Links 탭도 병행 조회해 아티스트·정리된 제목을 병합 (URL은 DailyDelta→Links로 치환해 유도)
-      const linksUrl = CFG.SHEET_CSV_URL.replace(/sheet=DailyDelta/i, 'sheet=Links');
-      const [rMain, rLinks] = await Promise.all([
-        fetch(CFG.SHEET_CSV_URL + bust(), { cache: 'no-store' }),
-        linksUrl !== CFG.SHEET_CSV_URL
-          ? fetch(linksUrl + bust(), { cache: 'no-store' }).catch(() => null)
-          : Promise.resolve(null),
-      ]);
-      if (rMain.ok) {
-        let linksMap = new Map();
-        try { if (rLinks && rLinks.ok) linksMap = parseLinksMap(parseCsv(await rLinks.text())); } catch (_) { /* 아티스트 없이 진행 */ }
-        const d = buildFromSheetRows(parseCsv(await rMain.text()), linksMap);
-        if (d.videos.length) {
-          dataSource = 'sheet';
-          console.log(`✅ 구글시트 실시간 데이터 사용 (${d.videos.length}개 영상 / 아티스트 ${linksMap.size}건 병합)`);
-          return d;
-        }
-      }
-      console.warn('시트 응답이 비었거나 오류 — 로컬 데이터로 대체합니다 (HTTP ' + rMain.status + ')');
-    } catch (e) { console.warn('시트 연동 실패 — 로컬 데이터로 대체합니다:', e.message); }
-  }
-  if (window.EMBEDDED_DATA) { dataSource = 'embedded'; return window.EMBEDDED_DATA; } // standalone 버전
-  const r = await fetch('data.json');
-  if (!r.ok) throw new Error('data.json 로드 실패');
-  dataSource = 'local';
-  return r.json();
+function activateSegment(group, button) {
+  group.querySelectorAll('button').forEach(item => {
+    item.classList.toggle('on', item === button);
+    item.setAttribute('aria-pressed', item === button ? 'true' : 'false');
+  });
+}
+
+function setTableFilter(status, shouldRender = true) {
+  tableFilter = status;
+  const button = $(`#seg-status [data-status="${status}"]`);
+  activateSegment($('#seg-status'), button);
+  if (shouldRender) renderTable();
 }
 
 function init() {
-  METRICS = new Map(DATA.videos.map(v => [v.id, computeMetrics(v, DATA.dateRange.end)]));
-  selectedIds = DATA.videos.slice(0, 5).map(v => v.id); // 조회수 상위 5곡 기본
-
   const gen = DATA.generatedAt
     ? new Date(DATA.generatedAt).toLocaleString('sv-SE', { hour12: false }).slice(0, 16)
     : '-';
-  const srcLabel = { sheet: '🟢 라이브 시트', embedded: '📦 내장 스냅샷', local: '💾 로컬 파일' }[dataSource];
+  const srcLabel = {
+    api: '🟢 라이브 API',
+    snapshot: '🟡 서버 스냅샷',
+    embedded: '📦 내장 스냅샷',
+    local: '💾 로컬 스냅샷',
+  }[dataSource];
   $('#hd-meta').textContent = `${srcLabel} · 갱신 ${gen} · 기간 ${DATA.dateRange.start} ~ ${DATA.dateRange.end}`;
-  $('#foot').textContent = `BNM YouTube 음원 모니터링 — 링크·썸네일은 video_id 기준으로 생성됩니다. 데이터 갱신: node scripts/build-data.mjs`;
+  $('#foot').textContent = 'BNM Youtube 아트트랙 모니터링';
 
   renderKPIs(); renderChart(); renderTable(); renderDrill();
 
   $('#seg-period').querySelectorAll('button').forEach(b => b.onclick = () => {
-    $('#seg-period .on').classList.remove('on'); b.classList.add('on');
+    activateSegment($('#seg-period'), b);
     period = b.dataset.p; renderChart();
   });
   $('#seg-view').querySelectorAll('button').forEach(b => b.onclick = () => {
-    $('#seg-view .on').classList.remove('on'); b.classList.add('on');
+    activateSegment($('#seg-view'), b);
     viewMode = b.dataset.v; renderChart();
   });
   $('#seg-num').querySelectorAll('button').forEach(b => b.onclick = () => {
-    $('#seg-num .on').classList.remove('on'); b.classList.add('on');
+    activateSegment($('#seg-num'), b);
     numMode = b.dataset.n; renderKPIs(); renderTable(); renderDrill();
   });
-  document.querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => {
-    const k = th.dataset.sort;
-    if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = k === 'title' ? 1 : -1; }
+  $('#seg-growth').querySelectorAll('button').forEach(b => b.onclick = () => {
+    activateSegment($('#seg-growth'), b);
+    tableWindow = Number(b.dataset.w);
     renderTable();
   });
-  $('#id-btn').onclick = lookupId;
-  $('#id-input').addEventListener('keydown', e => { if (e.key === 'Enter') lookupId(); });
-  $('#reg-submit').onclick = submitRegister;
-  $('#reg-title').addEventListener('keydown', e => { if (e.key === 'Enter') submitRegister(); });
-  $('#reg-artist').addEventListener('keydown', e => { if (e.key === 'Enter') $('#reg-title').focus(); });
-  window.addEventListener('resize', () => { renderChart(); });
+  $('#seg-status').querySelectorAll('button').forEach(b => b.onclick = () => {
+    setTableFilter(b.dataset.status);
+  });
+  document.querySelectorAll('th[data-sort]').forEach(th => {
+    th.onclick = () => {
+      const k = th.dataset.sort;
+      if (sortKey === k) sortDir *= -1;
+      else {
+        sortKey = k;
+        sortDir = ['artist', 'title', 'uploadDate'].includes(k) ? 1 : -1;
+      }
+      renderTable();
+    };
+    th.onkeydown = event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        th.click();
+      }
+    };
+  });
+  window.addEventListener('resize', renderChart);
 }
 
 loadData().then(d => { DATA = d; init(); })
   .catch(e => {
     console.error(e);
-    $('#hd-meta').textContent = '데이터 로드 실패 — data.json이 있는지 확인하거나 index_standalone.html을 열어보세요.';
+    $('#hd-meta').textContent = '데이터 로드 실패 — ' + e.message;
   });
 </script>
 </body>
