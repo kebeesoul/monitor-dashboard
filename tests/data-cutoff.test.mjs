@@ -180,6 +180,8 @@ test('public and standalone HTML use the performance table for monitoring', () =
     assert.match(html, /let tableWindow = 1;[\s\S]*let sortKey = 'gain', sortDir = -1;/);
     assert.match(html, /data-sort="points"[^>]*>수집기간<\/th>/);
     assert.doesNotMatch(html, />포인트<\/th>/);
+    assert.match(html, /각 음원을 누르면 상세한 차트내용을 확인할 수 있습니다/);
+    assert.doesNotMatch(html, /표시 .*실제 관측 최대 .*행 클릭 시 차트 하이라이트 \+ 상세/);
     assert.match(html, /BNM Youtube 아트트랙 모니터링/);
     assert.doesNotMatch(html, /Designed by Kebee/);
     assert.match(html, /표시할 데이터가 없습니다/);

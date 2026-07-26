@@ -540,9 +540,8 @@ function tableRows() {
 
 function renderTable() {
   const rows = tableRows();
-  const maxObserved = Math.max(0, ...rows.map(({ growth }) => growth.observedDays));
   $('#growth-col').textContent = `최근 ${tableWindow}일 증가`;
-  $('#tbl-count').textContent = `표시 ${rows.length}/${DATA.videos.length}개 · 실제 관측 최대 ${maxObserved}일 · 행 클릭 시 차트 하이라이트 + 상세`;
+  $('#tbl-count').textContent = '각 음원을 누르면 상세한 차트내용을 확인할 수 있습니다';
   document.querySelectorAll('[data-filter-count]').forEach(element => {
     const status = element.dataset.filterCount;
     element.textContent = status === 'all'
