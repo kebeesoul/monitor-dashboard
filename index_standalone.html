@@ -454,8 +454,7 @@ function renderKPIs() {
       <div class="k-value small" title="${esc(top.title)}">${esc(top.title.length > 22 ? top.title.slice(0,22) + '…' : top.title)}</div>
       <div class="k-sub">+${fmt(topD7)} · ${dirHtml(topPct)}</div></div>
     <div class="kpi"><div class="k-label">최신 스크랩 날짜</div>
-      <div class="k-value small">${end}</div>
-      <div class="k-sub">데이터 ${DATA.videos.reduce((a,v)=>a+v.history.length,0).toLocaleString()}포인트</div></div>`;
+      <div class="k-value small">${end}</div></div>`;
 }
 
 function periodStart() {
