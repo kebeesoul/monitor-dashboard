@@ -441,6 +441,7 @@ function renderKPIs() {
   const topD7 = top.monitoring.growth[7].increase;
   const topD7prev = windowSum(top.history, previous7End, 7);
   const topPct = topD7prev > 0 ? (topD7 - topD7prev) / topD7prev * 100 : 0;
+  const topLabel = `${top.artist} - ${top.title}`;
   const newCount = vs.filter(v => v.monitoring.alerts.includes('new')).length;
 
   $('#kpi-row').innerHTML = `
@@ -451,7 +452,7 @@ function renderKPIs() {
       <div class="k-value">+${fmt(d7all)}</div>
       <div class="k-sub">${dirHtml(d7pct)} 직전 7일 대비</div></div>
     <div class="kpi"><div class="k-label">최고 성장 영상 (7일)</div>
-      <div class="k-value small" title="${esc(top.title)}">${esc(top.title.length > 22 ? top.title.slice(0,22) + '…' : top.title)}</div>
+      <div class="k-value small" title="${esc(topLabel)}">${esc(topLabel)}</div>
       <div class="k-sub">+${fmt(topD7)} · ${dirHtml(topPct)}</div></div>
     <div class="kpi"><div class="k-label">최신 스크랩 날짜</div>
       <div class="k-value small">${end}</div></div>`;

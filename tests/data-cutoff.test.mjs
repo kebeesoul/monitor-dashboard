@@ -185,6 +185,8 @@ test('public and standalone HTML use the performance table for monitoring', () =
     assert.match(html, /BNM Youtube 아트트랙 모니터링/);
     assert.doesNotMatch(html, /Designed by Kebee/);
     assert.match(html, /표시할 데이터가 없습니다/);
+    assert.match(html, /const topLabel = `\$\{top\.artist\} - \$\{top\.title\}`;/);
+    assert.match(html, /title="\$\{esc\(topLabel\)\}">\$\{esc\(topLabel\)\}<\/div>/);
     assert.match(html, /<div class="k-label">최신 스크랩 날짜<\/div>/);
     assert.doesNotMatch(html, /<div class="k-sub">데이터 [\s\S]*?포인트<\/div>/);
     assert.match(html, /데이터 포인트가 1개뿐이라 추세를 계산할 수 없습니다/);
