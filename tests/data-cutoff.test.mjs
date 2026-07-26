@@ -176,7 +176,8 @@ test('public and standalone HTML use the performance table for monitoring', () =
     assert.match(html, /data-status="all"[\s\S]*data-status="spike"[\s\S]*data-status="accelerating"[\s\S]*data-status="decelerating"[\s\S]*data-status="missing"[\s\S]*data-status="new"/);
     assert.match(html, /해당 상태의 영상이 없습니다/);
     assert.ok(html.indexOf('영상별 성과') < html.indexOf('조회수 추세'));
-    assert.match(html, /data-sort="artist"[^>]*>아티스트<\/th>[\s\S]*data-sort="title"[^>]*>제목<\/th>[\s\S]*data-sort="uploadDate"[^>]*>업로드일<\/th>/);
+    assert.match(html, /data-sort="artist"[^>]*>아티스트<\/th>[\s\S]*data-sort="title"[^>]*>제목<\/th>[\s\S]*data-sort="uploadDate"[^>]*>발매일<\/th>/);
+    assert.doesNotMatch(html, /data-sort="uploadDate"[^>]*>업로드일<\/th>/);
     assert.match(html, /let tableWindow = 1;[\s\S]*let sortKey = 'gain', sortDir = -1;/);
     assert.match(html, /data-sort="points"[^>]*>수집기간<\/th>/);
     assert.doesNotMatch(html, />포인트<\/th>/);
@@ -187,6 +188,8 @@ test('public and standalone HTML use the performance table for monitoring', () =
     assert.match(html, /표시할 데이터가 없습니다/);
     assert.match(html, /const topLabel = `\$\{top\.artist\} - \$\{top\.title\}`;/);
     assert.match(html, /title="\$\{esc\(topLabel\)\}">\$\{esc\(topLabel\)\}<\/div>/);
+    assert.match(html, /\$\{esc\(v\.artist\)\} - \$\{esc\(v\.title\)\} ↗<\/a>/);
+    assert.match(html, />발매일 \$\{v\.uploadDate\}<\/div>/);
     assert.match(html, /<div class="k-label">최신 스크랩 날짜<\/div>/);
     assert.doesNotMatch(html, /<div class="k-sub">데이터 [\s\S]*?포인트<\/div>/);
     assert.match(html, /데이터 포인트가 1개뿐이라 추세를 계산할 수 없습니다/);
