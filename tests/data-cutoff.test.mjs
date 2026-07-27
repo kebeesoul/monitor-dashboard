@@ -55,8 +55,8 @@ test('source dates define the range without a hardcoded cutoff', () => {
 
   assert.deepEqual(result.dateRange, { start: '2026-07-21', end: '2026-07-22' });
   assert.deepEqual(result.videos[0].history, [
-    { date: '2026-07-21', views: 90, delta: 0, rate: 0 },
-    { date: '2026-07-22', views: 100, delta: 10, rate: 11.11 },
+    { date: '2026-07-21', weekday: '화', weekdayIndex: 2, views: 90, delta: 0, rate: 0 },
+    { date: '2026-07-22', weekday: '수', weekdayIndex: 3, views: 100, delta: 10, rate: 11.11 },
   ]);
   assert.deepEqual(result.videos[0].monitoring, {
     asOf: '2026-07-22',
@@ -102,9 +102,9 @@ test('Links metadata does not alter or discard DailyDelta history', () => {
   ], LINKS);
 
   assert.deepEqual(result.videos[0].history, [
-    { date: '2026-07-21', views: 90, delta: 0, rate: 0 },
-    { date: '2026-07-22', views: 100, delta: 10, rate: 11.11 },
-    { date: '2026-07-23', views: 121, delta: 21, rate: 21 },
+    { date: '2026-07-21', weekday: '화', weekdayIndex: 2, views: 90, delta: 0, rate: 0 },
+    { date: '2026-07-22', weekday: '수', weekdayIndex: 3, views: 100, delta: 10, rate: 11.11 },
+    { date: '2026-07-23', weekday: '목', weekdayIndex: 4, views: 121, delta: 21, rate: 21 },
   ]);
 });
 
@@ -117,8 +117,31 @@ test('same-day duplicates keep the highest view count', () => {
   ], LINKS);
 
   assert.deepEqual(result.videos[0].history, [
-    { date: '2026-07-22', views: 110, delta: 0, rate: 0 },
-    { date: '2026-07-23', views: 121, delta: 11, rate: 10 },
+    { date: '2026-07-22', weekday: '수', weekdayIndex: 3, views: 110, delta: 0, rate: 0 },
+    { date: '2026-07-23', weekday: '목', weekdayIndex: 4, views: 121, delta: 11, rate: 10 },
+  ]);
+});
+
+test('weekday summaries use Monday-first order and daily averages', () => {
+  const result = buildDashboardData([
+    ['date', 'artist', 'video_id', 'delta', 'views'],
+    ['2026-07-20', 'Track', 'abcdefghijk', '0', '100'],
+    ['2026-07-21', 'Track', 'abcdefghijk', '10', '110'],
+    ['2026-07-20', 'Track', SECOND_ID, '0', '200'],
+    ['2026-07-21', 'Track', SECOND_ID, '30', '230'],
+  ], [
+    ...LINKS,
+    ['', SECOND_ID, 'Artist', 'Second title', '2020-02-03', `https://www.youtube.com/watch?v=${SECOND_ID}`],
+  ]);
+
+  assert.deepEqual(result.weekdaySummary, [
+    { weekday: '월', weekdayIndex: 1, sampleCount: 2, totalDelta: 0, averageDelta: 0 },
+    { weekday: '화', weekdayIndex: 2, sampleCount: 2, totalDelta: 40, averageDelta: 40 },
+    { weekday: '수', weekdayIndex: 3, sampleCount: 0, totalDelta: 0, averageDelta: 0 },
+    { weekday: '목', weekdayIndex: 4, sampleCount: 0, totalDelta: 0, averageDelta: 0 },
+    { weekday: '금', weekdayIndex: 5, sampleCount: 0, totalDelta: 0, averageDelta: 0 },
+    { weekday: '토', weekdayIndex: 6, sampleCount: 0, totalDelta: 0, averageDelta: 0 },
+    { weekday: '일', weekdayIndex: 7, sampleCount: 0, totalDelta: 0, averageDelta: 0 },
   ]);
 });
 
@@ -155,8 +178,13 @@ test('generated snapshot is internally consistent', () => {
   assert.ok(snapshot.videos.every(video => video.artist));
   assert.ok(snapshot.videos.every(video => /^\d{4}-\d{2}-\d{2}$/.test(video.uploadDate)));
   assert.ok(snapshot.videos.every(video => video.history[0].delta === 0 && video.history[0].rate === 0));
+  assert.ok(snapshot.videos.every(video => video.history.every(point => (
+    /^[월화수목금토일]$/.test(point.weekday)
+    && Number.isInteger(point.weekdayIndex)
+  ))));
   assert.ok(snapshot.videos.every(video => video.monitoring.asOf === snapshot.dateRange.end));
   assert.ok(snapshot.videos.every(video => video.monitoring.alerts.includes('new')));
+  assert.deepEqual(snapshot.weekdaySummary.map(item => item.weekday), ['월', '화', '수', '목', '금', '토', '일']);
 });
 
 test('public and standalone HTML use the performance table for monitoring', () => {
@@ -195,6 +223,19 @@ test('public and standalone HTML use the performance table for monitoring', () =
     assert.match(html, /데이터 포인트가 1개뿐이라 추세를 계산할 수 없습니다/);
     assert.doesNotMatch(html, /id="id-input"|id="id-btn"|id="id-msg"|lookupId|extractVideoId|DATA\.videos\.slice\(0, 5\)/);
     assert.match(html, /colspan="10">해당 상태의 영상이 없습니다/);
+    assert.match(html, /<title>Brand New Music - 유튜브뮤직 음원 모니터링<\/title>/);
+    assert.match(html, /class="hd-title">Brand New Music - 유튜브뮤직 음원 모니터링<\/div>/);
+    assert.doesNotMatch(html, /BNM YouTube 음원 모니터링/);
+    assert.match(html, /<details class="panel tbl-panel weekday-panel">\s*<summary class="weekday-summary">/);
+    assert.doesNotMatch(html, /<details class="panel tbl-panel weekday-panel"[^>]*\sopen(?:\s|>)/);
+    assert.match(html, /id="weekday-body"/);
+    assert.match(html, /data-weekday-sort="weekdayIndex"[^>]*>요일<\/th>[\s\S]*data-weekday-sort="sampleCount"[^>]*>수집 건수<\/th>/);
+    assert.match(html, /let weekdaySortKey = 'weekdayIndex', weekdaySortDir = 1;/);
+    assert.match(html, /function renderWeekdayTable\(\)/);
+    assert.match(html, /<th>날짜<\/th><th>요일<\/th><th>조회수<\/th>/);
+    assert.match(html, /class="clear-all"[^>]*>전부 취소<\/button>/);
+    assert.match(html, /selectedIds\.length[\s\S]*class="clear-all"/);
+    assert.match(html, /function clearAllSelections\(\)[\s\S]*selectedIds = \[\];[\s\S]*highlightId = null;/);
     assert.doesNotMatch(html, /docs\.google\.com\/spreadsheets/);
     assert.doesNotMatch(html, /DATA_START_DATE|SHEET_CSV_URL|SHEET_WRITE_URL|YT_API_KEY/);
   }

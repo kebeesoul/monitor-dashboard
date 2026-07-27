@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BNM YouTube 음원 모니터링</title>
+<title>Brand New Music - 유튜브뮤직 음원 모니터링</title>
 <link rel="icon" href="data:,">
 <style>
 :root {
@@ -85,6 +85,13 @@ header {
 .chip .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip.off { opacity: 0.4; }
 .chip.hl { border-color: var(--accent); }
+.clear-all {
+  border: 1px solid #f7d8be; background: #fff3e8; color: #c55a11;
+  border-radius: 980px; padding: 3px 10px; font-size: 12px;
+  font-family: var(--font); cursor: pointer; white-space: nowrap;
+}
+.clear-all:hover { background: #fde8d5; }
+.clear-all:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 #chart-box { position: relative; }
 #chart-box svg { display: block; width: 100%; }
 #tooltip {
@@ -110,6 +117,12 @@ header {
 
 /* ── table ── */
 .tbl-panel { margin-top: 0; }
+.weekday-panel { margin-top: 12px; }
+.weekday-summary { cursor: pointer; user-select: none; }
+.weekday-summary::marker { color: var(--accent); }
+.weekday-summary h2 { display: inline; }
+.weekday-summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
+.weekday-panel[open] .weekday-summary { margin-bottom: 8px; }
 .tbl-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
 .tbl-head h2 { margin-right: auto; }
 .status-seg { flex-basis: 100%; overflow-x: auto; }
@@ -134,6 +147,7 @@ table.perf tbody tr.sel { background: #eef5fd; }
 table.perf tbody tr.table-empty { cursor: default; }
 table.perf tbody tr.table-empty:hover { background: transparent; }
 table.perf tbody tr.table-empty td { color: var(--ink-3); padding: 28px 10px; text-align: center; }
+table.weekday-perf tbody tr { cursor: default; }
 .t-thumb { width: 64px; height: 36px; object-fit: cover; border-radius: 5px; display: block; background: #e8e8ed; }
 .t-artist { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
 .t-title { max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
@@ -164,7 +178,7 @@ footer { margin-top: 14px; font-size: 11px; color: var(--ink-3); text-align: cen
 <header>
   <div class="hd-in">
     <div>
-      <div class="hd-title">BNM YouTube 음원 모니터링</div>
+      <div class="hd-title">Brand New Music - 유튜브뮤직 음원 모니터링</div>
       <div class="hd-meta" id="hd-meta">데이터 로딩 중…</div>
     </div>
   </div>
@@ -210,6 +224,25 @@ footer { margin-top: 14px; font-size: 11px; color: var(--ink-3); text-align: cen
       </table>
     </div>
   </div>
+
+  <details class="panel tbl-panel weekday-panel">
+    <summary class="weekday-summary">
+      <h2>요일별 성과 <span style="font-weight:400;color:var(--ink-3);font-size:12px">전체 수집 기간 기준</span></h2>
+    </summary>
+    <div class="tbl-scroll">
+      <table class="perf weekday-perf">
+        <thead>
+          <tr>
+            <th class="left" data-weekday-sort="weekdayIndex" tabindex="0">요일</th>
+            <th data-weekday-sort="sampleCount" tabindex="0">수집 건수</th>
+            <th data-weekday-sort="totalDelta" tabindex="0">조회수 증가분 합계</th>
+            <th data-weekday-sort="averageDelta" tabindex="0">일평균 증가분</th>
+          </tr>
+        </thead>
+        <tbody id="weekday-body"></tbody>
+      </table>
+    </div>
+  </details>
 
   <div class="main-grid">
     <div class="panel">
@@ -406,6 +439,7 @@ let viewMode = 'delta';
 let tableWindow = 1;
 let tableFilter = 'all';
 let sortKey = 'gain', sortDir = -1;
+let weekdaySortKey = 'weekdayIndex', weekdaySortDir = 1;
 let dataSource = 'local';   // 'api' | 'snapshot' | 'embedded' | 'local'
 const ALERT_META = {
   missing: { cls:'b-missing', label:'수집 누락', tip:'전체 최신 날짜에 해당 영상의 데이터가 없습니다' },
@@ -479,11 +513,14 @@ function renderChart() {
   attachTooltip($('#chart-box'), svg, series, geo);
 
   // legend chips
+  const clearButton = selectedIds.length
+    ? '<button class="clear-all" type="button">전부 취소</button>'
+    : '';
   $('#legend').innerHTML = series.map(s =>
     `<button class="chip${s.id === highlightId ? ' hl' : ''}" data-id="${s.id}" title="${esc(s.name)} — 클릭: 하이라이트, ✕: 차트에서 제거">
       <span class="dot" style="background:${s.color}"></span><span class="nm">${esc(s.name)}</span>
       <span class="x" data-x="${s.id}" style="color:var(--ink-3)">✕</span>
-    </button>`).join('');
+    </button>`).join('') + clearButton;
   $('#legend').querySelectorAll('.chip').forEach(ch => {
     ch.onclick = e => {
       const id = ch.dataset.id;
@@ -491,6 +528,7 @@ function renderChart() {
       setHighlight(highlightId === id ? null : id, false);
     };
   });
+  $('#legend').querySelector('.clear-all')?.addEventListener('click', clearAllSelections);
 }
 
 function toggleSeries(id) {
@@ -502,6 +540,12 @@ function toggleSeries(id) {
     selectedIds.push(id);
   }
   renderChart(); renderTable();
+}
+
+function clearAllSelections() {
+  selectedIds = [];
+  highlightId = null;
+  renderChart(); renderTable(); renderDrill();
 }
 
 function badgeHtml(v) {
@@ -579,6 +623,29 @@ function renderTable() {
   });
 }
 
+function renderWeekdayTable() {
+  const rows = [...DATA.weekdaySummary].sort((a, b) => {
+    const order = weekdaySortDir * (a[weekdaySortKey] - b[weekdaySortKey]);
+    return order || a.weekdayIndex - b.weekdayIndex;
+  });
+  $('#weekday-body').innerHTML = rows.map(item => `
+    <tr>
+      <td class="left">${item.weekday}</td>
+      <td>${fmtFull(item.sampleCount)}</td>
+      <td class="${item.totalDelta < 0 ? 'dir-down' : ''}">${sign(item.totalDelta)}${fmt(item.totalDelta)}</td>
+      <td class="${item.averageDelta < 0 ? 'dir-down' : ''}">${sign(item.averageDelta)}${fmt(item.averageDelta)}</td>
+    </tr>`).join('');
+  document.querySelectorAll('th[data-weekday-sort]').forEach(th => {
+    const base = th.textContent.replace(/[▲▼]\s*$/, '').trim();
+    th.innerHTML = base + (th.dataset.weekdaySort === weekdaySortKey
+      ? ` <span class="arr">${weekdaySortDir < 0 ? '▼' : '▲'}</span>`
+      : '');
+    th.setAttribute('aria-sort', th.dataset.weekdaySort === weekdaySortKey
+      ? (weekdaySortDir < 0 ? 'descending' : 'ascending')
+      : 'none');
+  });
+}
+
 function setHighlight(id, addToChart) {
   highlightId = id;
   if (id && addToChart && !selectedIds.includes(id)) selectedIds.push(id);
@@ -628,8 +695,8 @@ function renderDrill() {
          <svg id="drill-chart" height="140" style="width:100%"></svg>`}
     <div style="font-size:12px;font-weight:600;color:var(--ink-3)">최근 14일</div>
     <div style="max-height:170px;overflow-y:auto">
-    <table class="mini-table"><thead><tr><th>날짜</th><th>조회수</th><th>증가</th><th>증가율</th></tr></thead>
-    <tbody>${recent.map(p => `<tr><td>${p.date}</td><td>${fmtFull(p.views)}</td>
+    <table class="mini-table"><thead><tr><th>날짜</th><th>요일</th><th>조회수</th><th>증가</th><th>증가율</th></tr></thead>
+    <tbody>${recent.map(p => `<tr><td>${p.date}</td><td>${p.weekday}</td><td>${fmtFull(p.views)}</td>
       <td class="${p.delta < 0 ? 'dir-down' : ''}">${sign(p.delta)}${fmtFull(p.delta)}</td>
       <td>${p.rate.toFixed(2)}%</td></tr>`).join('')}</tbody></table></div>`;
   if (!single) {
@@ -640,16 +707,34 @@ function renderDrill() {
 
 /* ═══════════════ 데이터 로드 ═══════════════ */
 function validateDashboardPayload(data) {
+  const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
   if (!data || !Array.isArray(data.videos) || !data.videos.length) {
     throw new Error('대시보드 데이터가 비어 있습니다');
   }
   if (!data.dateRange?.start || !data.dateRange?.end) {
     throw new Error('대시보드 날짜 범위가 없습니다');
   }
+  if (
+    !Array.isArray(data.weekdaySummary)
+    || data.weekdaySummary.length !== weekdays.length
+    || data.weekdaySummary.some((item, index) => (
+      item.weekday !== weekdays[index]
+      || item.weekdayIndex !== index + 1
+      || !Number.isFinite(item.sampleCount)
+      || !Number.isFinite(item.totalDelta)
+      || !Number.isFinite(item.averageDelta)
+    ))
+  ) {
+    throw new Error('요일별 집계가 올바르지 않습니다');
+  }
   if (data.videos.some(video => (
     !String(video.artist || '').trim()
     || !/^\d{4}-\d{2}-\d{2}$/.test(video.uploadDate)
     || video.monitoring?.asOf !== data.dateRange.end
+    || video.history.some(point => (
+      !Number.isInteger(point.weekdayIndex)
+      || point.weekday !== weekdays[point.weekdayIndex - 1]
+    ))
   ))) {
     throw new Error('영상 모니터링 지표가 올바르지 않습니다');
   }
@@ -706,7 +791,7 @@ function init() {
   $('#hd-meta').textContent = `${srcLabel} · 갱신 ${gen} · 기간 ${DATA.dateRange.start} ~ ${DATA.dateRange.end}`;
   $('#foot').textContent = 'BNM Youtube 아트트랙 모니터링';
 
-  renderKPIs(); renderChart(); renderTable(); renderDrill();
+  renderKPIs(); renderChart(); renderTable(); renderWeekdayTable(); renderDrill();
 
   $('#seg-period').querySelectorAll('button').forEach(b => b.onclick = () => {
     activateSegment($('#seg-period'), b);
@@ -718,7 +803,7 @@ function init() {
   });
   $('#seg-num').querySelectorAll('button').forEach(b => b.onclick = () => {
     activateSegment($('#seg-num'), b);
-    numMode = b.dataset.n; renderKPIs(); renderTable(); renderDrill();
+    numMode = b.dataset.n; renderKPIs(); renderTable(); renderWeekdayTable(); renderDrill();
   });
   $('#seg-growth').querySelectorAll('button').forEach(b => b.onclick = () => {
     activateSegment($('#seg-growth'), b);
@@ -737,6 +822,23 @@ function init() {
         sortDir = ['artist', 'title', 'uploadDate'].includes(k) ? 1 : -1;
       }
       renderTable();
+    };
+    th.onkeydown = event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        th.click();
+      }
+    };
+  });
+  document.querySelectorAll('th[data-weekday-sort]').forEach(th => {
+    th.onclick = () => {
+      const key = th.dataset.weekdaySort;
+      if (weekdaySortKey === key) weekdaySortDir *= -1;
+      else {
+        weekdaySortKey = key;
+        weekdaySortDir = key === 'weekdayIndex' ? 1 : -1;
+      }
+      renderWeekdayTable();
     };
     th.onkeydown = event => {
       if (event.key === 'Enter' || event.key === ' ') {
