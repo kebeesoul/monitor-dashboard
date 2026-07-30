@@ -122,6 +122,53 @@ test('same-day duplicates keep the highest view count', () => {
   ]);
 });
 
+test('official total views begin at a zero-delta baseline without rewriting audio history', () => {
+  const result = buildDashboardData([
+    ['date', 'artist', 'video_id', 'delta', 'views', 'increase-rate', '요일', 'total_delta', 'total_views', 'total_increase-rate'],
+    ['2026-07-21', 'Track', 'abcdefghijk', '0', '100', '0', '화', '', '', ''],
+    ['2026-07-22', 'Track', 'abcdefghijk', '10', '110', '0.1', '수', '0', '200', '0'],
+    ['2026-07-23', 'Track', 'abcdefghijk', '10', '120', '0.09', '목', '25', '225', '0.125'],
+  ], [
+    ['', 'video_id', 'artist', 'title', 'upload_date', 'mv_video_id'],
+    ['', 'abcdefghijk', 'Artist', 'Listed title', '2020-01-02', 'mvfirst1234'],
+  ]);
+
+  assert.equal(result.videos[0].mvId, 'mvfirst1234');
+  assert.equal(result.videos[0].currentViews, 120);
+  assert.equal(result.videos[0].currentTotalViews, 225);
+  assert.deepEqual(result.videos[0].history, [
+    { date: '2026-07-21', weekday: '화', weekdayIndex: 2, views: 100, delta: 0, rate: 0 },
+    {
+      date: '2026-07-22',
+      weekday: '수',
+      weekdayIndex: 3,
+      views: 110,
+      delta: 10,
+      rate: 10,
+      totalViews: 200,
+      totalDelta: 0,
+      totalRate: 0,
+    },
+    {
+      date: '2026-07-23',
+      weekday: '목',
+      weekdayIndex: 4,
+      views: 120,
+      delta: 10,
+      rate: 9.09,
+      totalViews: 225,
+      totalDelta: 25,
+      totalRate: 12.5,
+    },
+  ]);
+  assert.equal(result.videos[0].monitoring.latestTotalRate, 12.5);
+  assert.deepEqual(result.videos[0].monitoring.totalGrowth, {
+    1: { increase: 25, observedDays: 1 },
+    7: { increase: 25, observedDays: 1 },
+    30: { increase: 25, observedDays: 1 },
+  });
+});
+
 test('weekday summaries use Monday-first order and daily averages', () => {
   const result = buildDashboardData([
     ['date', 'artist', 'video_id', 'delta', 'views'],
@@ -183,7 +230,11 @@ test('generated snapshot is internally consistent', () => {
     && Number.isInteger(point.weekdayIndex)
   ))));
   assert.ok(snapshot.videos.every(video => video.monitoring.asOf === snapshot.dateRange.end));
-  assert.ok(snapshot.videos.every(video => video.monitoring.alerts.includes('new')));
+  const allowedAlerts = new Set(['new', 'missing', 'spike', 'accelerating', 'decelerating']);
+  assert.ok(snapshot.videos.every(video => (
+    Array.isArray(video.monitoring.alerts)
+    && video.monitoring.alerts.every(alert => allowedAlerts.has(alert))
+  )));
   assert.deepEqual(snapshot.weekdaySummary.map(item => item.weekday), ['월', '화', '수', '목', '금', '토', '일']);
 });
 
@@ -232,13 +283,23 @@ test('public and standalone HTML use the performance table for monitoring', () =
     assert.match(html, /data-weekday-sort="weekdayIndex"[^>]*>요일<\/th>[\s\S]*data-weekday-sort="sampleCount"[^>]*>수집 건수<\/th>/);
     assert.match(html, /let weekdaySortKey = 'weekdayIndex', weekdaySortDir = 1;/);
     assert.match(html, /function renderWeekdayTable\(\)/);
-    assert.match(html, /<th>날짜<\/th><th>요일<\/th><th>조회수<\/th>/);
+    assert.match(html, /<th>날짜<\/th><th>요일<\/th><th>조회수 전체 \(Art Track\)<\/th>/);
     assert.match(html, /class="clear-all"[^>]*>전부 취소<\/button>/);
     assert.match(html, /selectedIds\.length[\s\S]*class="clear-all"/);
     assert.match(html, /function clearAllSelections\(\)[\s\S]*selectedIds = \[\];[\s\S]*highlightId = null;/);
     assert.doesNotMatch(html, /docs\.google\.com\/spreadsheets/);
     assert.doesNotMatch(html, /DATA_START_DATE|SHEET_CSV_URL|SHEET_WRITE_URL|YT_API_KEY/);
   }
+});
+
+test('public dashboard labels total and Art Track values together', () => {
+  const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
+
+  assert.match(html, /현재 조회수 전체 \(Art Track\)/);
+  assert.match(html, /최근 \$\{tableWindow\}일 증가 전체 \(Art Track\)/);
+  assert.match(html, /v\.currentTotalViews/);
+  assert.match(html, /monitoring\.totalGrowth/);
+  assert.match(html, /Art Track/);
 });
 
 test('latest daily rates and 1, 7, 30 day gains are available for every listed video', () => {

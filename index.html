@@ -148,6 +148,8 @@ table.perf tbody tr.table-empty { cursor: default; }
 table.perf tbody tr.table-empty:hover { background: transparent; }
 table.perf tbody tr.table-empty td { color: var(--ink-3); padding: 28px 10px; text-align: center; }
 table.weekday-perf tbody tr { cursor: default; }
+.metric-main { font-weight: 600; }
+.metric-sub { color: var(--ink-3); font-size: 11px; }
 .t-thumb { width: 64px; height: 36px; object-fit: cover; border-radius: 5px; display: block; background: #e8e8ed; }
 .t-artist { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
 .t-title { max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
@@ -212,9 +214,9 @@ footer { margin-top: 14px; font-size: 11px; color: var(--ink-3); text-align: cen
             <th class="left" data-sort="artist" tabindex="0">아티스트</th>
             <th class="left" data-sort="title" tabindex="0">제목</th>
             <th data-sort="uploadDate" tabindex="0">발매일</th>
-            <th data-sort="views" tabindex="0">현재 조회수</th>
-            <th id="growth-col" data-sort="gain" tabindex="0">최근 1일 증가</th>
-            <th data-sort="rate" tabindex="0">최근 증가율</th>
+            <th data-sort="views" tabindex="0">현재 조회수 전체 (Art Track)</th>
+            <th id="growth-col" data-sort="gain" tabindex="0">최근 1일 증가 전체 (Art Track)</th>
+            <th data-sort="rate" tabindex="0">최근 증가율 전체 (Art Track)</th>
             <th style="cursor:default">추세 (30일)</th>
             <th data-sort="points" tabindex="0">수집기간</th>
             <th class="left" style="cursor:default">상태</th>
@@ -227,7 +229,7 @@ footer { margin-top: 14px; font-size: 11px; color: var(--ink-3); text-align: cen
 
   <details class="panel tbl-panel weekday-panel">
     <summary class="weekday-summary">
-      <h2>요일별 성과 <span style="font-weight:400;color:var(--ink-3);font-size:12px">전체 수집 기간 기준</span></h2>
+      <h2>요일별 성과 <span style="font-weight:400;color:var(--ink-3);font-size:12px">전체 수집 기간 · Art Track 기준</span></h2>
     </summary>
     <div class="tbl-scroll">
       <table class="perf weekday-perf">
@@ -247,7 +249,7 @@ footer { margin-top: 14px; font-size: 11px; color: var(--ink-3); text-align: cen
   <div class="main-grid">
     <div class="panel">
       <div class="chart-head">
-        <h2>조회수 추세</h2>
+        <h2>조회수 추세 <span style="font-weight:400;color:var(--ink-3);font-size:12px">Art Track 기준</span></h2>
         <div class="seg" id="seg-period">
           <button data-p="7" class="on" aria-pressed="true">7일</button>
           <button data-p="30" aria-pressed="false">30일</button>
@@ -295,6 +297,15 @@ function fmtAbbr(n) {
 }
 function fmt(n) { return numMode === 'abbr' ? fmtAbbr(n) : fmtFull(n); }
 function sign(n) { return n > 0 ? '+' : ''; }
+function dualCount(total, audio, signed = false) {
+  const totalText = Number.isFinite(total) ? `${signed ? sign(total) : ''}${fmt(total)}` : '—';
+  const audioText = `${signed ? sign(audio) : ''}${fmt(audio)}`;
+  return `<div class="metric-main">${totalText}</div><div class="metric-sub">(Art Track ${audioText})</div>`;
+}
+function dualRate(total, audio) {
+  const rateText = value => value == null ? '—' : `${value > 0 ? '+' : ''}${value.toFixed(2)}%`;
+  return `<div class="metric-main">${rateText(total)}</div><div class="metric-sub">(Art Track ${rateText(audio)})</div>`;
+}
 function dirHtml(pct, invert) {
   if (!isFinite(pct) || Math.abs(pct) < 0.05) return '<span class="dir-flat">— 0%</span>';
   const up = pct > 0;
@@ -556,7 +567,10 @@ function badgeHtml(v) {
 }
 
 function selectedGrowth(v) {
-  return v.monitoring.growth[tableWindow];
+  return {
+    audio: v.monitoring.growth[tableWindow],
+    total: v.monitoring.totalGrowth?.[tableWindow] || null,
+  };
 }
 
 function tableRows() {
@@ -568,9 +582,9 @@ function tableRows() {
       artist: v.artist,
       title: v.title,
       uploadDate: v.uploadDate,
-      views: v.currentViews,
-      gain: growth.increase,
-      rate: v.monitoring.latestRate,
+      views: v.currentTotalViews ?? v.currentViews,
+      gain: growth.total?.increase ?? growth.audio.increase,
+      rate: v.monitoring.latestTotalRate ?? v.monitoring.latestRate,
       points: v.history.length,
     };
   }).filter(({ v }) => tableFilter === 'all' || v.monitoring.alerts.includes(tableFilter));
@@ -584,7 +598,7 @@ function tableRows() {
 
 function renderTable() {
   const rows = tableRows();
-  $('#growth-col').textContent = `최근 ${tableWindow}일 증가`;
+  $('#growth-col').textContent = `최근 ${tableWindow}일 증가 전체 (Art Track)`;
   $('#tbl-count').textContent = '각 음원을 누르면 상세한 차트내용을 확인할 수 있습니다';
   document.querySelectorAll('[data-filter-count]').forEach(element => {
     const status = element.dataset.filterCount;
@@ -598,10 +612,10 @@ function renderTable() {
       <td class="left"><div class="t-artist" title="${esc(v.artist)}">${esc(v.artist)}</div></td>
       <td class="left"><div class="t-title" title="${esc(v.title)}">${esc(v.title)}</div></td>
       <td>${v.uploadDate}</td>
-      <td>${fmt(v.currentViews)}</td>
-      <td class="${growth.increase < 0 ? 'dir-down' : ''}" title="최근 ${tableWindow}일 중 실제 관측 ${growth.observedDays}일">
-        ${sign(growth.increase)}${fmt(growth.increase)}</td>
-      <td>${v.monitoring.latestRate == null ? '—' : `${v.monitoring.latestRate > 0 ? '+' : ''}${v.monitoring.latestRate.toFixed(2)}%`}</td>
+      <td>${dualCount(v.currentTotalViews, v.currentViews)}</td>
+      <td title="전체 관측 ${growth.total?.observedDays ?? 0}일 · Art Track 관측 ${growth.audio.observedDays}일">
+        ${dualCount(growth.total?.increase, growth.audio.increase, true)}</td>
+      <td>${dualRate(v.monitoring.latestTotalRate, v.monitoring.latestRate)}</td>
       <td>${sparkline(v.history, 90, 26)}</td>
       <td title="실제 수집된 날짜 ${v.history.length}일">${v.history.length}일</td>
       <td class="left">${badgeHtml(v) || '<span style="color:var(--ink-3)">—</span>'}</td>
@@ -687,7 +701,8 @@ function renderDrill() {
       <img class="d-thumb" src="${v.thumb}" alt="${esc(v.title)}" onerror="this.style.display='none'"></a>
     <div class="d-title"><a href="${v.url}" target="_blank" rel="noopener">${esc(v.artist)} - ${esc(v.title)} ↗</a>
       ${badgeHtml(v)}</div>
-    <div style="font-size:13px">현재 <b>${fmtFull(v.currentViews)}</b>회</div>
+    <div style="font-size:13px">현재 전체 <b>${v.currentTotalViews == null ? '—' : fmtFull(v.currentTotalViews)}</b>회
+      <span style="color:var(--ink-3)">(Art Track ${fmtFull(v.currentViews)}회)</span></div>
     <div style="font-size:12px;color:var(--ink-3)">발매일 ${v.uploadDate}</div>
     ${single
       ? '<div class="d-summary">데이터 포인트가 1개뿐이라 추세를 계산할 수 없습니다. (신규)</div>'
@@ -695,13 +710,20 @@ function renderDrill() {
          <svg id="drill-chart" height="140" style="width:100%"></svg>`}
     <div style="font-size:12px;font-weight:600;color:var(--ink-3)">최근 14일</div>
     <div style="max-height:170px;overflow-y:auto">
-    <table class="mini-table"><thead><tr><th>날짜</th><th>요일</th><th>조회수</th><th>증가</th><th>증가율</th></tr></thead>
-    <tbody>${recent.map(p => `<tr><td>${p.date}</td><td>${p.weekday}</td><td>${fmtFull(p.views)}</td>
-      <td class="${p.delta < 0 ? 'dir-down' : ''}">${sign(p.delta)}${fmtFull(p.delta)}</td>
-      <td>${p.rate.toFixed(2)}%</td></tr>`).join('')}</tbody></table></div>`;
+    <table class="mini-table"><thead><tr><th>날짜</th><th>요일</th><th>조회수 전체 (Art Track)</th><th>증가 전체 (Art Track)</th><th>증가율 전체 (Art Track)</th></tr></thead>
+    <tbody>${recent.map(p => `<tr><td>${p.date}</td><td>${p.weekday}</td><td>${dualCount(p.totalViews, p.views)}</td>
+      <td>${dualCount(p.totalDelta, p.delta, true)}</td>
+      <td>${dualRate(p.totalRate, p.rate)}</td></tr>`).join('')}</tbody></table></div>`;
   if (!single) {
     const svg = $('#drill-chart');
-    renderLineChart(svg, [{ id: v.id, name: v.title, color: '#0071e3', points: v.history.map(p => ({ date: p.date, value: p.views })) }], {});
+    const series = [
+      { id: `${v.id}-audio`, name: 'Art Track', color: '#0071e3', points: v.history.map(p => ({ date: p.date, value: p.views })) },
+    ];
+    const totalPoints = v.history
+      .filter(p => Number.isFinite(p.totalViews))
+      .map(p => ({ date: p.date, value: p.totalViews }));
+    if (totalPoints.length) series.unshift({ id: `${v.id}-total`, name: '전체', color: '#1d1d1f', points: totalPoints });
+    renderLineChart(svg, series, {});
   }
 }
 
@@ -731,9 +753,17 @@ function validateDashboardPayload(data) {
     !String(video.artist || '').trim()
     || !/^\d{4}-\d{2}-\d{2}$/.test(video.uploadDate)
     || video.monitoring?.asOf !== data.dateRange.end
+    || (
+      video.currentTotalViews != null
+      && (
+        !Number.isFinite(video.currentTotalViews)
+        || ![1, 7, 30].every(days => Number.isFinite(video.monitoring?.totalGrowth?.[days]?.increase))
+      )
+    )
     || video.history.some(point => (
       !Number.isInteger(point.weekdayIndex)
       || point.weekday !== weekdays[point.weekdayIndex - 1]
+      || (point.totalViews != null && !Number.isFinite(point.totalViews))
     ))
   ))) {
     throw new Error('영상 모니터링 지표가 올바르지 않습니다');
