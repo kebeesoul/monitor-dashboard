@@ -103,6 +103,45 @@ test('Matrix planning reuses today, reads the previous date, and appends new IDs
   );
 });
 
+test('replacing a track ID keeps the old Matrix history separate and baselines the new ID', () => {
+  const matrix = [
+    ['title', 'video_id', '2026-07-30 00:00 (목)', '2026-07-31 00:00 (금)'],
+    ['착각', 'AMJHxEA-J8A', '1,674,650 (+2,903)', '1,679,077 (+4,427)'],
+  ];
+  const tracks = [
+    {
+      video_id: 'eS4Xbayh2jA',
+      artist: '양다일',
+      title: '착각',
+      upload_date: '2017-12-29',
+      mv_video_id: '',
+    },
+  ];
+  const plan = tracker.planMatrixChanges_(
+    matrix,
+    tracks,
+    { eS4Xbayh2jA: 40440000 },
+    '2026-08-01',
+  );
+
+  assert.equal(plan.matrixAdded, 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(plan.addedRows)), [
+    ['착각', 'eS4Xbayh2jA'],
+  ]);
+  assert.deepEqual(JSON.parse(JSON.stringify(plan.todayValues)), [
+    [''],
+    ['40,440,000'],
+  ]);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(plan.entries.map(entry => ({
+      video_id: entry.video_id,
+      delta: entry.delta,
+      rate: entry.rate,
+    })))),
+    [{ video_id: 'eS4Xbayh2jA', delta: 0, rate: 0 }],
+  );
+});
+
 test('DailyDelta planning upserts the same Korean date without adding duplicates', () => {
   const entries = [
     {

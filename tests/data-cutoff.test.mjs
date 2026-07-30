@@ -108,6 +108,39 @@ test('Links metadata does not alter or discard DailyDelta history', () => {
   ]);
 });
 
+test('a corrected Links ID replaces the old video and starts a new frontend baseline', () => {
+  const result = buildDashboardData([
+    ['date', 'artist', 'video_id', 'delta', 'views'],
+    ['2026-07-31', '양다일', 'AMJHxEA-J8A', '4427', '1679077'],
+    ['2026-08-01', '양다일', 'eS4Xbayh2jA', '0', '40440000'],
+  ], [
+    ['', 'video_id', 'artist', 'title', 'upload_date', 'youtube_url'],
+    ['', 'eS4Xbayh2jA', '양다일', '착각', '2017-12-29', 'https://www.youtube.com/watch?v=eS4Xbayh2jA'],
+  ]);
+
+  assert.deepEqual(result.dateRange, { start: '2026-08-01', end: '2026-08-01' });
+  assert.deepEqual(result.videos.map(video => ({
+    id: video.id,
+    currentViews: video.currentViews,
+    history: video.history,
+  })), [
+    {
+      id: 'eS4Xbayh2jA',
+      currentViews: 40440000,
+      history: [
+        {
+          date: '2026-08-01',
+          weekday: '토',
+          weekdayIndex: 6,
+          views: 40440000,
+          delta: 0,
+          rate: 0,
+        },
+      ],
+    },
+  ]);
+});
+
 test('same-day duplicates keep the highest view count', () => {
   const result = buildDashboardData([
     ['date', 'artist', 'video_id', 'delta', 'views'],
