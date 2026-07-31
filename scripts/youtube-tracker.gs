@@ -6,6 +6,8 @@
  */
 
 var TRACKER_TIMEZONE = 'Asia/Seoul';
+var TRACKER_YTMUSIC_COUNTS_URL =
+  'https://bnm-youtube-monitor.vercel.app/api/ytmusic';
 var TRACKER_SHEETS = {
   links: 'Links',
   matrix: 'Matrix',
@@ -126,7 +128,13 @@ function parseLinkRows_(rows) {
   if (!rows || !rows.length) return [];
 
   var map = headerMapFromRow_(rows[0]);
-  var required = ['video_id', 'artist', 'title', 'upload_date'];
+  var required = [
+    'video_id',
+    'artist',
+    'title',
+    'upload_date',
+    'ytmusic_video_id',
+  ];
   required.forEach(function(name) {
     if (map[name] == null) throw new Error('Links header is missing: ' + name);
   });
@@ -138,6 +146,16 @@ function parseLinkRows_(rows) {
     var id = String(row[map.video_id] || '').trim();
     if (!/^[A-Za-z0-9_-]{11}$/.test(id) || seen[id]) continue;
     seen[id] = true;
+    var albumId = map.album_id == null
+      ? ''
+      : validAlbumIdOrBlank_(row[map.album_id]);
+    var ytmusicVideoId = validVideoIdOrBlank_(row[map.ytmusic_video_id]);
+    if (albumId && !ytmusicVideoId) {
+      throw new Error(
+        'Links row ' + (rowIndex + 1)
+        + ' has album_id without ytmusic_video_id'
+      );
+    }
     tracks.push({
       video_id: id,
       artist: String(row[map.artist] || '').trim(),
@@ -146,9 +164,8 @@ function parseLinkRows_(rows) {
       mv_video_id: map.mv_video_id == null
         ? ''
         : validVideoIdOrBlank_(row[map.mv_video_id]),
-      album_id: map.album_id == null
-        ? ''
-        : validAlbumIdOrBlank_(row[map.album_id]),
+      album_id: albumId,
+      ytmusic_video_id: ytmusicVideoId,
       total_baseline_date: map.total_baseline_date == null
         ? ''
         : normalizeDateValue_(row[map.total_baseline_date]),
@@ -244,116 +261,36 @@ function fetchYouTubeBatch_(ids, apiKey) {
 }
 
 function fetchYouTubeMusicAlbumViews_(tracks) {
-  var targetsByAlbum = {};
-  tracks.forEach(function(track) {
-    if (!track.album_id) return;
-    if (!targetsByAlbum[track.album_id]) targetsByAlbum[track.album_id] = {};
-    targetsByAlbum[track.album_id][track.video_id] = true;
-  });
-
-  var views = {};
-  Object.keys(targetsByAlbum).forEach(function(albumId) {
-    var response = fetchYouTubeMusicAlbum_(albumId);
-    collectAlbumPlayCounts_(
-      JSON.parse(response.getContentText()),
-      targetsByAlbum[albumId],
-      views
-    );
-  });
-  return views;
-}
-
-function fetchYouTubeMusicAlbum_(albumId) {
-  var endpoint = 'https://music.youtube.com/youtubei/v1/browse?alt=json';
-  var clientVersion = '1.'
-    + Utilities.formatDate(new Date(), 'GMT', 'yyyyMMdd')
-    + '.01.00';
-  var payload = JSON.stringify({
-    browseId: albumId,
-    context: {
-      client: {
-        clientName: 'WEB_REMIX',
-        clientVersion: clientVersion,
-        hl: 'ko',
-        gl: 'KR',
-      },
-      user: {},
-    },
-  });
   var lastError = null;
 
   for (var attempt = 1; attempt <= 3; attempt++) {
     try {
-      var response = UrlFetchApp.fetch(endpoint, {
-        method: 'post',
-        contentType: 'application/json',
-        headers: { Origin: 'https://music.youtube.com' },
-        payload: payload,
+      var response = UrlFetchApp.fetch(TRACKER_YTMUSIC_COUNTS_URL, {
         muteHttpExceptions: true,
       });
       var status = response.getResponseCode();
-      if (status >= 200 && status < 300) return response;
-      lastError = new Error('YouTube Music HTTP ' + status + ': ' + albumId);
+      if (status >= 200 && status < 300) {
+        var body = JSON.parse(response.getContentText());
+        var views = {};
+        tracks.forEach(function(track) {
+          if (!track.album_id) return;
+          var value = Number(body.counts && body.counts[track.video_id]);
+          if (isFinite(value)) views[track.video_id] = value;
+        });
+        return views;
+      } else {
+        lastError = new Error(
+          'YouTube Music counts HTTP ' + status
+          + ': ' + response.getContentText().slice(0, 300)
+        );
+      }
     } catch (error) {
       lastError = error;
     }
     if (attempt < 3) Utilities.sleep(attempt * 1000);
   }
 
-  throw lastError || new Error('YouTube Music request failed: ' + albumId);
-}
-
-function collectAlbumPlayCounts_(node, targetIds, result) {
-  if (!node || typeof node !== 'object') return;
-  if (node.musicResponsiveListItemRenderer) {
-    var renderer = node.musicResponsiveListItemRenderer;
-    var videoId = findVideoId_(renderer);
-    if (videoId && targetIds[videoId]) {
-      var text = findPlayCountText_(renderer);
-      var count = parseYouTubeMusicPlayCount_(text);
-      if (count != null) result[videoId] = count;
-    }
-    return;
-  }
-  Object.keys(node).forEach(function(key) {
-    collectAlbumPlayCounts_(node[key], targetIds, result);
-  });
-}
-
-function findVideoId_(node) {
-  if (!node || typeof node !== 'object') return '';
-  if (/^[A-Za-z0-9_-]{11}$/.test(String(node.videoId || ''))) {
-    return String(node.videoId);
-  }
-  var keys = Object.keys(node);
-  for (var index = 0; index < keys.length; index++) {
-    var id = findVideoId_(node[keys[index]]);
-    if (id) return id;
-  }
-  return '';
-}
-
-function findPlayCountText_(node) {
-  if (typeof node === 'string') {
-    return /회\s*재생$/.test(node.trim()) ? node.trim() : '';
-  }
-  if (!node || typeof node !== 'object') return '';
-  var keys = Object.keys(node);
-  for (var index = 0; index < keys.length; index++) {
-    var text = findPlayCountText_(node[keys[index]]);
-    if (text) return text;
-  }
-  return '';
-}
-
-function parseYouTubeMusicPlayCount_(value) {
-  var text = String(value || '').replace(/,/g, '').trim();
-  var match = text.match(/([\d.]+)\s*(천|만|억)?회(?:\s*재생)?/);
-  if (!match) return null;
-  var number = Number(match[1]);
-  if (!isFinite(number)) return null;
-  var multiplier = { '': 1, '천': 1000, '만': 10000, '억': 100000000 };
-  return Math.round(number * multiplier[match[2] || '']);
+  throw lastError || new Error('YouTube Music counts request failed');
 }
 
 function planMatrixChanges_(matrixValues, tracks, viewMap, todayKey) {

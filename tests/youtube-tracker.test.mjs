@@ -15,11 +15,11 @@ vm.runInContext(SOURCE, tracker);
 
 test('Links rows are parsed by header name and duplicate IDs are removed', () => {
   const rows = [
-    ['album_id', 'title', 'total_baseline_date', 'upload_date', 'mv_video_id', 'artist', 'video_id'],
-    ['MPREb_first123', 'First title', '2026-07-31', '2026-07-01', 'mvfirst1234', 'First artist', 'abcdefghijk'],
-    ['MPREb_duplicate', 'Duplicate title', '2026-08-01', '2026-07-02', 'mvsecond123', 'Other artist', 'abcdefghijk'],
-    ['invalid', 'Invalid', '', '2026-07-03', '', 'Artist', 'too-short'],
-    ['', 'Second title', '', '2026-07-04', '', 'Second artist', 'lmnopqrstuv'],
+    ['album_id', 'title', 'total_baseline_date', 'upload_date', 'ytmusic_video_id', 'mv_video_id', 'artist', 'video_id'],
+    ['MPREb_first123', 'First title', '2026-07-31', '2026-07-01', 'ytmusic1234', 'mvfirst1234', 'First artist', 'abcdefghijk'],
+    ['MPREb_duplicate', 'Duplicate title', '2026-08-01', '2026-07-02', 'duplicate12', 'mvsecond123', 'Other artist', 'abcdefghijk'],
+    ['invalid', 'Invalid', '', '2026-07-03', '', '', 'Artist', 'too-short'],
+    ['', 'Second title', '', '2026-07-04', '', '', 'Second artist', 'lmnopqrstuv'],
   ];
 
   assert.deepEqual(
@@ -32,6 +32,7 @@ test('Links rows are parsed by header name and duplicate IDs are removed', () =>
         upload_date: '2026-07-01',
         mv_video_id: 'mvfirst1234',
         album_id: 'MPREb_first123',
+        ytmusic_video_id: 'ytmusic1234',
         total_baseline_date: '2026-07-31',
       },
       {
@@ -41,6 +42,7 @@ test('Links rows are parsed by header name and duplicate IDs are removed', () =>
         upload_date: '2026-07-04',
         mv_video_id: '',
         album_id: '',
+        ytmusic_video_id: '',
         total_baseline_date: '',
       },
     ],
@@ -68,41 +70,28 @@ test('YouTube IDs are split into API batches of at most 50', () => {
   assert.deepEqual(JSON.parse(JSON.stringify(batches.flat())), ids);
 });
 
-test('YouTube Music Korean play counts are converted to integer display baselines', () => {
-  assert.equal(tracker.parseYouTubeMusicPlayCount_('512회 재생'), 512);
-  assert.equal(tracker.parseYouTubeMusicPlayCount_('9.4천회 재생'), 9400);
-  assert.equal(tracker.parseYouTubeMusicPlayCount_('1638만회 재생'), 16380000);
-  assert.equal(tracker.parseYouTubeMusicPlayCount_('1억회 재생'), 100000000);
-  assert.equal(tracker.parseYouTubeMusicPlayCount_('not available'), null);
-});
+test('YouTube Music totals are read from the fixed dashboard catalog endpoint', () => {
+  let requestedUrl = '';
+  tracker.UrlFetchApp = {
+    fetch: url => {
+      requestedUrl = url;
+      return {
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify({
+          counts: { abcdefghijk: 16_380_000 },
+        }),
+      };
+    },
+  };
 
-test('album browse responses map play counts to the requested Art Track IDs', () => {
-  const result = {};
-  tracker.collectAlbumPlayCounts_({
-    contents: [
-      {
-        musicResponsiveListItemRenderer: {
-          overlay: { watchEndpoint: { videoId: 'abcdefghijk' } },
-          flexColumns: [
-            { text: { runs: [{ text: 'Track title' }] } },
-            { text: { runs: [{ text: '1638만회 재생' }] } },
-          ],
-        },
-      },
-      {
-        musicResponsiveListItemRenderer: {
-          overlay: { watchEndpoint: { videoId: 'ignored12345' } },
-          flexColumns: [
-            { text: { runs: [{ text: 'Other title' }] } },
-            { text: { runs: [{ text: '999만회 재생' }] } },
-          ],
-        },
-      },
-    ],
-  }, { abcdefghijk: true }, result);
+  const result = tracker.fetchYouTubeMusicAlbumViews_([
+    { video_id: 'abcdefghijk', album_id: 'MPREb_first' },
+    { video_id: 'lmnopqrstuv', album_id: '' },
+  ]);
 
+  assert.equal(requestedUrl, tracker.TRACKER_YTMUSIC_COUNTS_URL);
   assert.deepEqual(JSON.parse(JSON.stringify(result)), {
-    abcdefghijk: 16380000,
+    abcdefghijk: 16_380_000,
   });
 });
 
