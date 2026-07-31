@@ -63,23 +63,34 @@ function trackYouTubeViews() {
 
     var ids = sourceVideoIds_(tracks);
     var viewMap = fetchYouTubeViews_(ids, apiKey);
+    var albumViewMap = fetchYouTubeMusicAlbumViews_(tracks);
     var fetchedTrackCount = tracks.filter(function(track) {
       return Object.prototype.hasOwnProperty.call(viewMap, track.video_id);
     }).length;
     var missingIds = ids.filter(function(id) {
       return !Object.prototype.hasOwnProperty.call(viewMap, id);
     });
+    var missingAlbumIds = tracks.filter(function(track) {
+      return track.album_id
+        && !Object.prototype.hasOwnProperty.call(albumViewMap, track.video_id);
+    }).map(function(track) {
+      return 'ytmusic:' + track.video_id;
+    });
+    missingIds = missingIds.concat(missingAlbumIds);
     state.fetched_count = fetchedTrackCount;
     state.missing_ids = missingIds.join(',');
 
     if (!fetchedTrackCount) throw new Error('YouTube API returned no requested Art Tracks');
+    if (missingAlbumIds.length) {
+      throw new Error('YouTube Music returned no album play count: ' + missingAlbumIds.join(','));
+    }
 
     var todayKey = koreanDateKey_(new Date());
     var matrixPlan = applyMatrixChanges_(matrixSheet, tracks, viewMap, todayKey);
     var dailyLastRow = Math.max(1, dailySheet.getLastRow());
     var dailyLastColumn = Math.max(10, dailySheet.getLastColumn());
     var dailyValues = dailySheet.getRange(1, 1, dailyLastRow, dailyLastColumn).getValues();
-    attachTotalMetrics_(matrixPlan.entries, tracks, viewMap, dailyValues, todayKey);
+    attachTotalMetrics_(matrixPlan.entries, tracks, albumViewMap, dailyValues, todayKey);
     var latestCount = writeLatest_(latestSheet, matrixPlan.entries, todayKey);
     var dailyResult = writeDailyDelta_(dailySheet, matrixPlan.entries, todayKey);
 
@@ -135,6 +146,12 @@ function parseLinkRows_(rows) {
       mv_video_id: map.mv_video_id == null
         ? ''
         : validVideoIdOrBlank_(row[map.mv_video_id]),
+      album_id: map.album_id == null
+        ? ''
+        : validAlbumIdOrBlank_(row[map.album_id]),
+      total_baseline_date: map.total_baseline_date == null
+        ? ''
+        : normalizeDateValue_(row[map.total_baseline_date]),
     });
   }
   return tracks;
@@ -145,15 +162,19 @@ function validVideoIdOrBlank_(value) {
   return /^[A-Za-z0-9_-]{11}$/.test(id) ? id : '';
 }
 
+function validAlbumIdOrBlank_(value) {
+  var id = String(value || '').trim();
+  return /^MPRE[A-Za-z0-9_-]+$/.test(id) ? id : '';
+}
+
 function sourceVideoIds_(tracks) {
   var seen = {};
   var ids = [];
   tracks.forEach(function(track) {
-    [track.video_id, track.mv_video_id].forEach(function(id) {
-      if (!id || seen[id]) return;
-      seen[id] = true;
-      ids.push(id);
-    });
+    var id = track.video_id;
+    if (!id || seen[id]) return;
+    seen[id] = true;
+    ids.push(id);
   });
   return ids;
 }
@@ -220,6 +241,119 @@ function fetchYouTubeBatch_(ids, apiKey) {
   }
 
   throw lastError || new Error('YouTube API request failed');
+}
+
+function fetchYouTubeMusicAlbumViews_(tracks) {
+  var targetsByAlbum = {};
+  tracks.forEach(function(track) {
+    if (!track.album_id) return;
+    if (!targetsByAlbum[track.album_id]) targetsByAlbum[track.album_id] = {};
+    targetsByAlbum[track.album_id][track.video_id] = true;
+  });
+
+  var views = {};
+  Object.keys(targetsByAlbum).forEach(function(albumId) {
+    var response = fetchYouTubeMusicAlbum_(albumId);
+    collectAlbumPlayCounts_(
+      JSON.parse(response.getContentText()),
+      targetsByAlbum[albumId],
+      views
+    );
+  });
+  return views;
+}
+
+function fetchYouTubeMusicAlbum_(albumId) {
+  var endpoint = 'https://music.youtube.com/youtubei/v1/browse?alt=json';
+  var clientVersion = '1.'
+    + Utilities.formatDate(new Date(), 'GMT', 'yyyyMMdd')
+    + '.01.00';
+  var payload = JSON.stringify({
+    browseId: albumId,
+    context: {
+      client: {
+        clientName: 'WEB_REMIX',
+        clientVersion: clientVersion,
+        hl: 'ko',
+        gl: 'KR',
+      },
+      user: {},
+    },
+  });
+  var lastError = null;
+
+  for (var attempt = 1; attempt <= 3; attempt++) {
+    try {
+      var response = UrlFetchApp.fetch(endpoint, {
+        method: 'post',
+        contentType: 'application/json',
+        headers: { Origin: 'https://music.youtube.com' },
+        payload: payload,
+        muteHttpExceptions: true,
+      });
+      var status = response.getResponseCode();
+      if (status >= 200 && status < 300) return response;
+      lastError = new Error('YouTube Music HTTP ' + status + ': ' + albumId);
+    } catch (error) {
+      lastError = error;
+    }
+    if (attempt < 3) Utilities.sleep(attempt * 1000);
+  }
+
+  throw lastError || new Error('YouTube Music request failed: ' + albumId);
+}
+
+function collectAlbumPlayCounts_(node, targetIds, result) {
+  if (!node || typeof node !== 'object') return;
+  if (node.musicResponsiveListItemRenderer) {
+    var renderer = node.musicResponsiveListItemRenderer;
+    var videoId = findVideoId_(renderer);
+    if (videoId && targetIds[videoId]) {
+      var text = findPlayCountText_(renderer);
+      var count = parseYouTubeMusicPlayCount_(text);
+      if (count != null) result[videoId] = count;
+    }
+    return;
+  }
+  Object.keys(node).forEach(function(key) {
+    collectAlbumPlayCounts_(node[key], targetIds, result);
+  });
+}
+
+function findVideoId_(node) {
+  if (!node || typeof node !== 'object') return '';
+  if (/^[A-Za-z0-9_-]{11}$/.test(String(node.videoId || ''))) {
+    return String(node.videoId);
+  }
+  var keys = Object.keys(node);
+  for (var index = 0; index < keys.length; index++) {
+    var id = findVideoId_(node[keys[index]]);
+    if (id) return id;
+  }
+  return '';
+}
+
+function findPlayCountText_(node) {
+  if (typeof node === 'string') {
+    return /회\s*재생$/.test(node.trim()) ? node.trim() : '';
+  }
+  if (!node || typeof node !== 'object') return '';
+  var keys = Object.keys(node);
+  for (var index = 0; index < keys.length; index++) {
+    var text = findPlayCountText_(node[keys[index]]);
+    if (text) return text;
+  }
+  return '';
+}
+
+function parseYouTubeMusicPlayCount_(value) {
+  var text = String(value || '').replace(/,/g, '').trim();
+  var match = text.match(/([\d.]+)\s*(천|만|억)?회(?:\s*재생)?/);
+  if (!match) return null;
+  var number = Number(match[1]);
+  if (!isFinite(number)) return null;
+  var multiplier = { '': 1, '천': 1000, '만': 10000, '억': 100000000 };
+  return Math.round(number * multiplier[match[2] || '']);
 }
 
 function planMatrixChanges_(matrixValues, tracks, viewMap, todayKey) {
@@ -349,7 +483,7 @@ function matrixDateHeader_(dateKey) {
   return dateKey + ' 00:00 (' + weekdayKorean_(dateKey) + ')';
 }
 
-function attachTotalMetrics_(entries, tracks, viewMap, dailyValues, todayKey) {
+function attachTotalMetrics_(entries, tracks, albumViewMap, dailyValues, todayKey) {
   var trackById = {};
   tracks.forEach(function(track) { trackById[track.video_id] = track; });
   var previousTotals = previousTotalsById_(dailyValues, todayKey);
@@ -357,15 +491,21 @@ function attachTotalMetrics_(entries, tracks, viewMap, dailyValues, todayKey) {
   entries.forEach(function(entry) {
     var track = trackById[entry.video_id];
     if (!track) return;
-    var mvId = track.mv_video_id;
-    if (mvId && !Object.prototype.hasOwnProperty.call(viewMap, mvId)) return;
+    if (
+      track.album_id
+      && !Object.prototype.hasOwnProperty.call(albumViewMap, entry.video_id)
+    ) return;
 
-    var totalViews = entry.views + (mvId ? Number(viewMap[mvId]) : 0);
+    var totalViews = track.album_id
+      ? Number(albumViewMap[entry.video_id])
+      : entry.views;
     var previous = previousTotals[entry.video_id];
-    var newlyMappedMv = mvId
+    var newlyMappedAlbum = track.album_id
       && previous
       && previous.totalViews === previous.views;
-    var delta = previous == null || newlyMappedMv
+    var baselineToday = track.album_id
+      && track.total_baseline_date === todayKey;
+    var delta = previous == null || newlyMappedAlbum || baselineToday
       ? 0
       : totalViews - previous.totalViews;
     entry.total_views = totalViews;

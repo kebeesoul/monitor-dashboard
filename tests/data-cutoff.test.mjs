@@ -155,18 +155,20 @@ test('same-day duplicates keep the highest view count', () => {
   ]);
 });
 
-test('official total views begin at a zero-delta baseline without rewriting audio history', () => {
+test('YouTube Music album views begin at a zero-delta baseline without rewriting Art Track history', () => {
   const result = buildDashboardData([
     ['date', 'artist', 'video_id', 'delta', 'views', 'increase-rate', '요일', 'total_delta', 'total_views', 'total_increase-rate'],
     ['2026-07-21', 'Track', 'abcdefghijk', '0', '100', '0', '화', '', '', ''],
     ['2026-07-22', 'Track', 'abcdefghijk', '10', '110', '0.1', '수', '0', '200', '0'],
     ['2026-07-23', 'Track', 'abcdefghijk', '10', '120', '0.09', '목', '25', '225', '0.125'],
   ], [
-    ['', 'video_id', 'artist', 'title', 'upload_date', 'mv_video_id'],
-    ['', 'abcdefghijk', 'Artist', 'Listed title', '2020-01-02', 'mvfirst1234'],
+    ['', 'video_id', 'artist', 'title', 'upload_date', 'mv_video_id', 'album_id', 'total_baseline_date'],
+    ['', 'abcdefghijk', 'Artist', 'Listed title', '2020-01-02', 'mvfirst1234', 'MPREb_test123', '2026-07-22'],
   ]);
 
   assert.equal(result.videos[0].mvId, 'mvfirst1234');
+  assert.equal(result.videos[0].albumId, 'MPREb_test123');
+  assert.equal(result.videos[0].totalSource, 'youtube_music_album');
   assert.equal(result.videos[0].currentViews, 120);
   assert.equal(result.videos[0].currentTotalViews, 225);
   assert.deepEqual(result.videos[0].history, [
@@ -202,14 +204,14 @@ test('official total views begin at a zero-delta baseline without rewriting audi
   });
 });
 
-test('a newly mapped official video uses the recorded zero-delta total baseline', () => {
+test('a newly mapped YouTube Music album uses the recorded zero-delta total baseline', () => {
   const result = buildDashboardData([
     ['date', 'artist', 'video_id', 'delta', 'views', 'increase-rate', '요일', 'total_delta', 'total_views', 'total_increase-rate'],
     ['2026-07-30', 'Track', 'abcdefghijk', '10', '100', '0.1', '목', '10', '100', '0.1'],
     ['2026-07-31', 'Track', 'abcdefghijk', '10', '110', '0.1', '금', '0', '610', '0'],
   ], [
-    ['', 'video_id', 'artist', 'title', 'upload_date', 'mv_video_id'],
-    ['', 'abcdefghijk', 'Artist', 'Listed title', '2020-01-02', 'mvfirst1234'],
+    ['', 'video_id', 'artist', 'title', 'upload_date', 'mv_video_id', 'album_id', 'total_baseline_date'],
+    ['', 'abcdefghijk', 'Artist', 'Listed title', '2020-01-02', 'mvfirst1234', 'MPREb_test123', '2026-07-31'],
   ]);
 
   assert.equal(result.videos[0].currentViews, 110);
@@ -315,7 +317,7 @@ test('public and standalone HTML use the performance table for monitoring', () =
     assert.match(html, /let tableWindow = 1;[\s\S]*let sortKey = 'gain', sortDir = -1;/);
     assert.match(html, /data-sort="points"[^>]*>수집기간<\/th>/);
     assert.doesNotMatch(html, />포인트<\/th>/);
-    assert.match(html, /각 음원을 누르면 상세한 차트내용을 확인할 수 있습니다/);
+    assert.match(html, /각 음원을 누르면 상세 차트를 볼 수 있습니다/);
     assert.doesNotMatch(html, /표시 .*실제 관측 최대 .*행 클릭 시 차트 하이라이트 \+ 상세/);
     assert.match(html, /BNM Youtube 아트트랙 모니터링/);
     assert.doesNotMatch(html, /Designed by Kebee/);
@@ -323,7 +325,7 @@ test('public and standalone HTML use the performance table for monitoring', () =
     assert.match(html, /const topLabel = `\$\{top\.artist\} - \$\{top\.title\}`;/);
     assert.match(html, /title="\$\{esc\(topLabel\)\}">\$\{esc\(topLabel\)\}<\/div>/);
     assert.match(html, /\$\{esc\(v\.artist\)\} - \$\{esc\(v\.title\)\} ↗<\/a>/);
-    assert.match(html, />발매일 \$\{v\.uploadDate\}<\/div>/);
+    assert.match(html, />발매일 \$\{v\.uploadDate\} · \$\{v\.totalSource/);
     assert.match(html, /<div class="k-label">최신 스크랩 날짜<\/div>/);
     assert.doesNotMatch(html, /<div class="k-sub">데이터 [\s\S]*?포인트<\/div>/);
     assert.match(html, /데이터 포인트가 1개뿐이라 추세를 계산할 수 없습니다/);
@@ -354,6 +356,8 @@ test('public dashboard labels total and Art Track values together', () => {
   assert.match(html, /최근 \$\{tableWindow\}일 증가 전체 \(Art Track\)/);
   assert.match(html, /v\.currentTotalViews/);
   assert.match(html, /monitoring\.totalGrowth/);
+  assert.match(html, /앨범 화면 표시 단위 기준/);
+  assert.match(html, /video_fallback|앨범 집계 미제공/);
   assert.match(html, /Art Track/);
 });
 

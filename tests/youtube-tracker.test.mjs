@@ -15,11 +15,11 @@ vm.runInContext(SOURCE, tracker);
 
 test('Links rows are parsed by header name and duplicate IDs are removed', () => {
   const rows = [
-    ['title', 'upload_date', 'mv_video_id', 'artist', 'video_id'],
-    ['First title', '2026-07-01', 'mvfirst1234', 'First artist', 'abcdefghijk'],
-    ['Duplicate title', '2026-07-02', 'mvsecond123', 'Other artist', 'abcdefghijk'],
-    ['Invalid', '2026-07-03', '', 'Artist', 'too-short'],
-    ['Second title', '2026-07-04', '', 'Second artist', 'lmnopqrstuv'],
+    ['album_id', 'title', 'total_baseline_date', 'upload_date', 'mv_video_id', 'artist', 'video_id'],
+    ['MPREb_first123', 'First title', '2026-07-31', '2026-07-01', 'mvfirst1234', 'First artist', 'abcdefghijk'],
+    ['MPREb_duplicate', 'Duplicate title', '2026-08-01', '2026-07-02', 'mvsecond123', 'Other artist', 'abcdefghijk'],
+    ['invalid', 'Invalid', '', '2026-07-03', '', 'Artist', 'too-short'],
+    ['', 'Second title', '', '2026-07-04', '', 'Second artist', 'lmnopqrstuv'],
   ];
 
   assert.deepEqual(
@@ -31,6 +31,8 @@ test('Links rows are parsed by header name and duplicate IDs are removed', () =>
         title: 'First title',
         upload_date: '2026-07-01',
         mv_video_id: 'mvfirst1234',
+        album_id: 'MPREb_first123',
+        total_baseline_date: '2026-07-31',
       },
       {
         video_id: 'lmnopqrstuv',
@@ -38,12 +40,14 @@ test('Links rows are parsed by header name and duplicate IDs are removed', () =>
         title: 'Second title',
         upload_date: '2026-07-04',
         mv_video_id: '',
+        album_id: '',
+        total_baseline_date: '',
       },
     ],
   );
 });
 
-test('audio and official MV IDs are deduplicated before API batching', () => {
+test('only Art Track IDs are deduplicated before YouTube Data API batching', () => {
   const tracks = [
     { video_id: 'abcdefghijk', mv_video_id: 'mvfirst1234' },
     { video_id: 'lmnopqrstuv', mv_video_id: 'mvfirst1234' },
@@ -52,7 +56,7 @@ test('audio and official MV IDs are deduplicated before API batching', () => {
 
   assert.deepEqual(
     JSON.parse(JSON.stringify(tracker.sourceVideoIds_(tracks))),
-    ['abcdefghijk', 'mvfirst1234', 'lmnopqrstuv', 'thirdid1234'],
+    ['abcdefghijk', 'lmnopqrstuv', 'thirdid1234'],
   );
 });
 
@@ -62,6 +66,44 @@ test('YouTube IDs are split into API batches of at most 50', () => {
 
   assert.deepEqual(JSON.parse(JSON.stringify(batches.map(batch => batch.length))), [50, 50, 1]);
   assert.deepEqual(JSON.parse(JSON.stringify(batches.flat())), ids);
+});
+
+test('YouTube Music Korean play counts are converted to integer display baselines', () => {
+  assert.equal(tracker.parseYouTubeMusicPlayCount_('512회 재생'), 512);
+  assert.equal(tracker.parseYouTubeMusicPlayCount_('9.4천회 재생'), 9400);
+  assert.equal(tracker.parseYouTubeMusicPlayCount_('1638만회 재생'), 16380000);
+  assert.equal(tracker.parseYouTubeMusicPlayCount_('1억회 재생'), 100000000);
+  assert.equal(tracker.parseYouTubeMusicPlayCount_('not available'), null);
+});
+
+test('album browse responses map play counts to the requested Art Track IDs', () => {
+  const result = {};
+  tracker.collectAlbumPlayCounts_({
+    contents: [
+      {
+        musicResponsiveListItemRenderer: {
+          overlay: { watchEndpoint: { videoId: 'abcdefghijk' } },
+          flexColumns: [
+            { text: { runs: [{ text: 'Track title' }] } },
+            { text: { runs: [{ text: '1638만회 재생' }] } },
+          ],
+        },
+      },
+      {
+        musicResponsiveListItemRenderer: {
+          overlay: { watchEndpoint: { videoId: 'ignored12345' } },
+          flexColumns: [
+            { text: { runs: [{ text: 'Other title' }] } },
+            { text: { runs: [{ text: '999만회 재생' }] } },
+          ],
+        },
+      },
+    ],
+  }, { abcdefghijk: true }, result);
+
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), {
+    abcdefghijk: 16380000,
+  });
 });
 
 test('Matrix planning reuses today, reads the previous date, and appends new IDs', () => {
@@ -199,28 +241,37 @@ test('total metrics use the previous collected total and baseline new totals at 
   const entries = [
     { video_id: 'abcdefghijk', views: 1200 },
     { video_id: 'lmnopqrstuv', views: 500 },
-    { video_id: 'newmvid1234', views: 600 },
+    { video_id: 'newalbum123', views: 600 },
   ];
   const tracks = [
-    { video_id: 'abcdefghijk', mv_video_id: 'mvfirst1234' },
-    { video_id: 'lmnopqrstuv', mv_video_id: '' },
-    { video_id: 'newmvid1234', mv_video_id: 'mvsecond123' },
+    {
+      video_id: 'abcdefghijk',
+      album_id: 'MPREb_existing',
+      total_baseline_date: '',
+    },
+    {
+      video_id: 'lmnopqrstuv',
+      album_id: '',
+      total_baseline_date: '',
+    },
+    {
+      video_id: 'newalbum123',
+      album_id: 'MPREb_new',
+      total_baseline_date: '2026-07-30',
+    },
   ];
   const daily = [
     ['date', 'artist', 'video_id', 'delta', 'views', 'increase-rate', '요일', 'total_delta', 'total_views', 'total_increase-rate'],
     ['2026-07-29', 'Existing title', 'abcdefghijk', 100, 1100, 0.1, '수', 200, 1900, 0.12],
-    ['2026-07-29', 'New MV title', 'newmvid1234', 50, 550, 0.1, '수', 50, 550, 0.1],
+    ['2026-07-29', 'New album title', 'newalbum123', 50, 550, 0.1, '수', 50, 900, 0.1],
   ];
 
   tracker.attachTotalMetrics_(
     entries,
     tracks,
     {
-      abcdefghijk: 1200,
-      mvfirst1234: 1000,
-      lmnopqrstuv: 500,
-      newmvid1234: 600,
-      mvsecond123: 400,
+      abcdefghijk: 2200,
+      newalbum123: 1000,
     },
     daily,
     '2026-07-30',
@@ -242,7 +293,7 @@ test('total metrics use the previous collected total and baseline new totals at 
       total_rate: 0,
     },
     {
-      video_id: 'newmvid1234',
+      video_id: 'newalbum123',
       views: 600,
       total_views: 1000,
       total_delta: 0,

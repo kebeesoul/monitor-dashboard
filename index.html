@@ -214,7 +214,7 @@ footer { margin-top: 14px; font-size: 11px; color: var(--ink-3); text-align: cen
             <th class="left" data-sort="artist" tabindex="0">아티스트</th>
             <th class="left" data-sort="title" tabindex="0">제목</th>
             <th data-sort="uploadDate" tabindex="0">발매일</th>
-            <th data-sort="views" tabindex="0">현재 조회수 전체 (Art Track)</th>
+            <th data-sort="views" tabindex="0" title="전체 = YouTube Music 앨범/릴리스 화면의 곡별 표시 재생수">현재 조회수 전체 (Art Track)</th>
             <th id="growth-col" data-sort="gain" tabindex="0">최근 1일 증가 전체 (Art Track)</th>
             <th data-sort="rate" tabindex="0">최근 증가율 전체 (Art Track)</th>
             <th style="cursor:default">추세 (30일)</th>
@@ -599,7 +599,7 @@ function tableRows() {
 function renderTable() {
   const rows = tableRows();
   $('#growth-col').textContent = `최근 ${tableWindow}일 증가 전체 (Art Track)`;
-  $('#tbl-count').textContent = '각 음원을 누르면 상세한 차트내용을 확인할 수 있습니다';
+  $('#tbl-count').textContent = '각 음원을 누르면 상세 차트를 볼 수 있습니다 · YouTube Music 값은 앨범 화면 표시 단위 기준';
   document.querySelectorAll('[data-filter-count]').forEach(element => {
     const status = element.dataset.filterCount;
     element.textContent = status === 'all'
@@ -612,8 +612,8 @@ function renderTable() {
       <td class="left"><div class="t-artist" title="${esc(v.artist)}">${esc(v.artist)}</div></td>
       <td class="left"><div class="t-title" title="${esc(v.title)}">${esc(v.title)}</div></td>
       <td>${v.uploadDate}</td>
-      <td>${dualCount(v.currentTotalViews, v.currentViews)}</td>
-      <td title="전체 관측 ${growth.total?.observedDays ?? 0}일 · Art Track 관측 ${growth.audio.observedDays}일">
+      <td title="${v.totalSource === 'youtube_music_album' ? 'YouTube Music 앨범 표시 집계' : '앨범 집계 미제공 · 영상 조회수 fallback'}">${dualCount(v.currentTotalViews, v.currentViews)}</td>
+      <td title="YouTube Music 관측 ${growth.total?.observedDays ?? 0}일 · Art Track 관측 ${growth.audio.observedDays}일">
         ${dualCount(growth.total?.increase, growth.audio.increase, true)}</td>
       <td>${dualRate(v.monitoring.latestTotalRate, v.monitoring.latestRate)}</td>
       <td>${sparkline(v.history, 90, 26)}</td>
@@ -703,7 +703,7 @@ function renderDrill() {
       ${badgeHtml(v)}</div>
     <div style="font-size:13px">현재 전체 <b>${v.currentTotalViews == null ? '—' : fmtFull(v.currentTotalViews)}</b>회
       <span style="color:var(--ink-3)">(Art Track ${fmtFull(v.currentViews)}회)</span></div>
-    <div style="font-size:12px;color:var(--ink-3)">발매일 ${v.uploadDate}</div>
+    <div style="font-size:12px;color:var(--ink-3)">발매일 ${v.uploadDate} · ${v.totalSource === 'youtube_music_album' ? '앨범 표시 집계' : '앨범 집계 미제공 · 영상 조회수 fallback'}</div>
     ${single
       ? '<div class="d-summary">데이터 포인트가 1개뿐이라 추세를 계산할 수 없습니다. (신규)</div>'
       : `<div class="d-summary">${esc(growthSummary(v))}</div>
