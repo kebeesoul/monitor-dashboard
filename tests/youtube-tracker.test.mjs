@@ -199,20 +199,29 @@ test('total metrics use the previous collected total and baseline new totals at 
   const entries = [
     { video_id: 'abcdefghijk', views: 1200 },
     { video_id: 'lmnopqrstuv', views: 500 },
+    { video_id: 'newmvid1234', views: 600 },
   ];
   const tracks = [
     { video_id: 'abcdefghijk', mv_video_id: 'mvfirst1234' },
     { video_id: 'lmnopqrstuv', mv_video_id: '' },
+    { video_id: 'newmvid1234', mv_video_id: 'mvsecond123' },
   ];
   const daily = [
     ['date', 'artist', 'video_id', 'delta', 'views', 'increase-rate', '요일', 'total_delta', 'total_views', 'total_increase-rate'],
     ['2026-07-29', 'Existing title', 'abcdefghijk', 100, 1100, 0.1, '수', 200, 1900, 0.12],
+    ['2026-07-29', 'New MV title', 'newmvid1234', 50, 550, 0.1, '수', 50, 550, 0.1],
   ];
 
   tracker.attachTotalMetrics_(
     entries,
     tracks,
-    { abcdefghijk: 1200, mvfirst1234: 1000, lmnopqrstuv: 500 },
+    {
+      abcdefghijk: 1200,
+      mvfirst1234: 1000,
+      lmnopqrstuv: 500,
+      newmvid1234: 600,
+      mvsecond123: 400,
+    },
     daily,
     '2026-07-30',
   );
@@ -229,6 +238,13 @@ test('total metrics use the previous collected total and baseline new totals at 
       video_id: 'lmnopqrstuv',
       views: 500,
       total_views: 500,
+      total_delta: 0,
+      total_rate: 0,
+    },
+    {
+      video_id: 'newmvid1234',
+      views: 600,
+      total_views: 1000,
       total_delta: 0,
       total_rate: 0,
     },

@@ -202,6 +202,28 @@ test('official total views begin at a zero-delta baseline without rewriting audi
   });
 });
 
+test('a newly mapped official video uses the recorded zero-delta total baseline', () => {
+  const result = buildDashboardData([
+    ['date', 'artist', 'video_id', 'delta', 'views', 'increase-rate', '요일', 'total_delta', 'total_views', 'total_increase-rate'],
+    ['2026-07-30', 'Track', 'abcdefghijk', '10', '100', '0.1', '목', '10', '100', '0.1'],
+    ['2026-07-31', 'Track', 'abcdefghijk', '10', '110', '0.1', '금', '0', '610', '0'],
+  ], [
+    ['', 'video_id', 'artist', 'title', 'upload_date', 'mv_video_id'],
+    ['', 'abcdefghijk', 'Artist', 'Listed title', '2020-01-02', 'mvfirst1234'],
+  ]);
+
+  assert.equal(result.videos[0].currentViews, 110);
+  assert.equal(result.videos[0].currentTotalViews, 610);
+  assert.equal(result.videos[0].history[1].delta, 10);
+  assert.equal(result.videos[0].history[1].totalDelta, 0);
+  assert.equal(result.videos[0].history[1].totalRate, 0);
+  assert.deepEqual(result.videos[0].monitoring.totalGrowth, {
+    1: { increase: 0, observedDays: 1 },
+    7: { increase: 10, observedDays: 1 },
+    30: { increase: 10, observedDays: 1 },
+  });
+});
+
 test('weekday summaries use Monday-first order and daily averages', () => {
   const result = buildDashboardData([
     ['date', 'artist', 'video_id', 'delta', 'views'],

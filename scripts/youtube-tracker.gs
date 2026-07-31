@@ -362,32 +362,60 @@ function attachTotalMetrics_(entries, tracks, viewMap, dailyValues, todayKey) {
 
     var totalViews = entry.views + (mvId ? Number(viewMap[mvId]) : 0);
     var previous = previousTotals[entry.video_id];
-    var delta = previous == null ? 0 : totalViews - previous;
+    var newlyMappedMv = mvId
+      && previous
+      && previous.totalViews === previous.views;
+    var delta = previous == null || newlyMappedMv
+      ? 0
+      : totalViews - previous.totalViews;
     entry.total_views = totalViews;
     entry.total_delta = delta;
-    entry.total_rate = previous > 0 ? delta / previous : 0;
+    entry.total_rate = previous && previous.totalViews > 0
+      ? delta / previous.totalViews
+      : 0;
   });
 }
 
 function previousTotalsById_(dailyValues, todayKey) {
   if (!dailyValues || !dailyValues.length) return {};
   var map = headerMapFromRow_(dailyValues[0]);
-  if (map.date == null || map.video_id == null || map.total_views == null) return {};
+  if (
+    map.date == null
+    || map.video_id == null
+    || map.views == null
+    || map.total_views == null
+  ) return {};
 
   var latest = {};
   for (var rowIndex = 1; rowIndex < dailyValues.length; rowIndex++) {
     var row = dailyValues[rowIndex];
     var dateKey = dateKeyFromValue_(row[map.date]);
     var id = String(row[map.video_id] || '').trim();
+    var views = numericCell_(row[map.views]);
     var totalViews = numericCell_(row[map.total_views]);
-    if (!dateKey || dateKey >= todayKey || !id || totalViews == null) continue;
+    if (
+      !dateKey
+      || dateKey >= todayKey
+      || !id
+      || views == null
+      || totalViews == null
+    ) continue;
     if (!latest[id] || dateKey > latest[id].dateKey) {
-      latest[id] = { dateKey: dateKey, totalViews: totalViews };
+      latest[id] = {
+        dateKey: dateKey,
+        views: views,
+        totalViews: totalViews,
+      };
     }
   }
 
   var totals = {};
-  Object.keys(latest).forEach(function(id) { totals[id] = latest[id].totalViews; });
+  Object.keys(latest).forEach(function(id) {
+    totals[id] = {
+      views: latest[id].views,
+      totalViews: latest[id].totalViews,
+    };
+  });
   return totals;
 }
 
