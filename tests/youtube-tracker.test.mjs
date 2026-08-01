@@ -95,6 +95,39 @@ test('YouTube Music totals are read from the fixed dashboard catalog endpoint', 
   });
 });
 
+test('a missing YouTube Music total leaves only that track total blank', () => {
+  const entries = [
+    { video_id: 'abcdefghijk', views: 1200 },
+    { video_id: 'lmnopqrstuv', views: 500 },
+  ];
+  const tracks = [
+    { video_id: 'abcdefghijk', album_id: 'MPREb_existing', total_baseline_date: '' },
+    { video_id: 'lmnopqrstuv', album_id: '', total_baseline_date: '' },
+  ];
+
+  tracker.attachTotalMetrics_(
+    entries,
+    tracks,
+    {},
+    [['date', 'video_id', 'views', 'total_views']],
+    '2026-08-02',
+  );
+
+  assert.deepEqual(JSON.parse(JSON.stringify(entries)), [
+    { video_id: 'abcdefghijk', views: 1200 },
+    {
+      video_id: 'lmnopqrstuv',
+      views: 500,
+      total_views: 500,
+      total_delta: 0,
+      total_rate: 0,
+    },
+  ]);
+  assert.doesNotMatch(SOURCE, /if \(missingAlbumIds\.length\)\s*\{\s*throw new Error/);
+  assert.match(SOURCE, /state\.status = missingIds\.length \? 'partial' : 'success'/);
+  assert.match(SOURCE, /'ytmusic:' \+ track\.video_id/);
+});
+
 test('Matrix planning reuses today, reads the previous date, and appends new IDs', () => {
   const matrix = [
     ['title', 'video_id', '2026-07-28 00:00 (화)', '2026-07-29 00:00 (수)'],

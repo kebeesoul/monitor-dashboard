@@ -83,9 +83,6 @@ function trackYouTubeViews() {
     state.missing_ids = missingIds.join(',');
 
     if (!fetchedTrackCount) throw new Error('YouTube API returned no requested Art Tracks');
-    if (missingAlbumIds.length) {
-      throw new Error('YouTube Music returned no album play count: ' + missingAlbumIds.join(','));
-    }
 
     var todayKey = koreanDateKey_(new Date());
     var matrixPlan = applyMatrixChanges_(matrixSheet, tracks, viewMap, todayKey);

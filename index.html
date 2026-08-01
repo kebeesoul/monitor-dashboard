@@ -216,7 +216,7 @@ footer { margin-top: 14px; font-size: 11px; color: var(--ink-3); text-align: cen
             <th data-sort="uploadDate" tabindex="0">발매일</th>
             <th data-sort="views" tabindex="0" title="전체 = YouTube Music 앨범/릴리스 화면의 곡별 표시 재생수">현재 조회수 전체 (Art Track)</th>
             <th id="growth-col" data-sort="gain" tabindex="0">최근 1일 증가 전체 (Art Track)</th>
-            <th data-sort="rate" tabindex="0">최근 증가율 전체 (Art Track)</th>
+            <th id="trend-col" data-sort="rate" tabindex="0">최근 1일 증가 추세 전체 (Art Track)</th>
             <th style="cursor:default">추세 (30일)</th>
             <th data-sort="points" tabindex="0">수집기간</th>
             <th class="left" style="cursor:default">상태</th>
@@ -305,6 +305,34 @@ function dualCount(total, audio, signed = false) {
 function dualRate(total, audio) {
   const rateText = value => value == null ? '—' : `${value > 0 ? '+' : ''}${value.toFixed(2)}%`;
   return `<div class="metric-main">${rateText(total)}</div><div class="metric-sub">(Art Track ${rateText(audio)})</div>`;
+}
+function trendRate(trend) {
+  return trend?.available
+    ? `${trend.changePercent > 0 ? '+' : ''}${trend.changePercent.toFixed(2)}%`
+    : '—';
+}
+function dualTrend(total, audio) {
+  const totalText = trendRate(total);
+  const audioText = trendRate(audio);
+  const subText = audio?.available
+    ? `(Art Track ${audioText})`
+    : total?.available
+      ? '(Art Track 비교 데이터 부족)'
+      : '(비교 데이터 부족)';
+  return `<div class="metric-main">${totalText}</div><div class="metric-sub">${subText}</div>`;
+}
+function trendMetricTitle(label, trend, days) {
+  if (!trend) return `${label}: 비교 데이터 부족 (전체 집계 없음)`;
+  if (trend.available) {
+    return `${label}: 직전 ${days}일 ${sign(trend.previousIncrease)}${fmtFull(trend.previousIncrease)} → 최근 ${days}일 ${sign(trend.currentIncrease)}${fmtFull(trend.currentIncrease)} (${trendRate(trend)})`;
+  }
+  if (trend.reason === 'non_positive_previous') {
+    return `${label}: 직전 ${days}일 증가량이 0 이하라 비교할 수 없습니다`;
+  }
+  return `${label}: 비교 데이터 부족 (필요 ${trend.requiredPoints}일, 확보 ${trend.observedPoints}일)`;
+}
+function trendTitle(total, audio, days) {
+  return `${trendMetricTitle('전체', total, days)} · ${trendMetricTitle('Art Track', audio, days)}`;
 }
 function dirHtml(pct, invert) {
   if (!isFinite(pct) || Math.abs(pct) < 0.05) return '<span class="dir-flat">— 0%</span>';
@@ -570,6 +598,8 @@ function selectedGrowth(v) {
   return {
     audio: v.monitoring.growth[tableWindow],
     total: v.monitoring.totalGrowth?.[tableWindow] || null,
+    audioTrend: v.monitoring.trend[tableWindow],
+    totalTrend: v.monitoring.totalTrend?.[tableWindow] || null,
   };
 }
 
@@ -584,7 +614,7 @@ function tableRows() {
       uploadDate: v.uploadDate,
       views: v.currentTotalViews ?? v.currentViews,
       gain: growth.total?.increase ?? growth.audio.increase,
-      rate: v.monitoring.latestTotalRate ?? v.monitoring.latestRate,
+      rate: growth.totalTrend?.changePercent ?? growth.audioTrend?.changePercent ?? null,
       points: v.history.length,
     };
   }).filter(({ v }) => tableFilter === 'all' || v.monitoring.alerts.includes(tableFilter));
@@ -599,6 +629,7 @@ function tableRows() {
 function renderTable() {
   const rows = tableRows();
   $('#growth-col').textContent = `최근 ${tableWindow}일 증가 전체 (Art Track)`;
+  $('#trend-col').textContent = `최근 ${tableWindow}일 증가 추세 전체 (Art Track)`;
   $('#tbl-count').textContent = '각 음원을 누르면 상세 차트를 볼 수 있습니다 · YouTube Music 값은 앨범 화면 표시 단위 기준';
   document.querySelectorAll('[data-filter-count]').forEach(element => {
     const status = element.dataset.filterCount;
@@ -615,7 +646,7 @@ function renderTable() {
       <td title="${v.totalSource === 'youtube_music_album' ? 'YouTube Music 앨범 표시 집계' : '앨범 집계 미제공 · 영상 조회수 fallback'}">${dualCount(v.currentTotalViews, v.currentViews)}</td>
       <td title="YouTube Music 관측 ${growth.total?.observedDays ?? 0}일 · Art Track 관측 ${growth.audio.observedDays}일">
         ${dualCount(growth.total?.increase, growth.audio.increase, true)}</td>
-      <td>${dualRate(v.monitoring.latestTotalRate, v.monitoring.latestRate)}</td>
+      <td title="${esc(trendTitle(growth.totalTrend, growth.audioTrend, tableWindow))}">${dualTrend(growth.totalTrend, growth.audioTrend)}</td>
       <td>${sparkline(v.history, 90, 26)}</td>
       <td title="실제 수집된 날짜 ${v.history.length}일">${v.history.length}일</td>
       <td class="left">${badgeHtml(v) || '<span style="color:var(--ink-3)">—</span>'}</td>
@@ -728,6 +759,13 @@ function renderDrill() {
 }
 
 /* ═══════════════ 데이터 로드 ═══════════════ */
+function validTrendPayload(trend, days) {
+  return typeof trend?.available === 'boolean'
+    && trend.requiredPoints === days * 2 + 1
+    && Number.isInteger(trend.observedPoints)
+    && (trend.available ? Number.isFinite(trend.changePercent) : trend.changePercent === null);
+}
+
 function validateDashboardPayload(data) {
   const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
   if (!data || !Array.isArray(data.videos) || !data.videos.length) {
@@ -753,12 +791,17 @@ function validateDashboardPayload(data) {
     !String(video.artist || '').trim()
     || !/^\d{4}-\d{2}-\d{2}$/.test(video.uploadDate)
     || video.monitoring?.asOf !== data.dateRange.end
+    || ![1, 7, 30].every(days => validTrendPayload(video.monitoring?.trend?.[days], days))
     || (
       video.currentTotalViews != null
       && (
         !Number.isFinite(video.currentTotalViews)
         || ![1, 7, 30].every(days => Number.isFinite(video.monitoring?.totalGrowth?.[days]?.increase))
       )
+    )
+    || (
+      video.monitoring?.totalTrend != null
+      && ![1, 7, 30].every(days => validTrendPayload(video.monitoring.totalTrend[days], days))
     )
     || video.history.some(point => (
       !Number.isInteger(point.weekdayIndex)

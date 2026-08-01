@@ -70,14 +70,78 @@ test('catalog collection reads Links and fetches each configured album', async (
     });
   };
 
-  const counts = await fetchYtmusicCounts({
+  const result = await fetchYtmusicCounts({
     spreadsheetId: 'sheet-id',
     sheets: { links: 'Links' },
   }, fetchImpl, new Date('2026-07-31T00:00:00Z'));
 
-  assert.deepEqual(counts, {
-    abcdefghijk: 1_000_000,
-    lmnopqrstuv: 2_500_000,
+  assert.deepEqual(result, {
+    counts: {
+      abcdefghijk: 1_000_000,
+      lmnopqrstuv: 2_500_000,
+    },
+    missing: [],
   });
   assert.equal(calls.length, 3);
+});
+
+test('a missing track count returns the available catalog as a partial result', async () => {
+  const fetchImpl = async (url, options) => {
+    if (String(url).includes('docs.google.com')) {
+      return new Response([
+        'video_id,album_id,ytmusic_video_id',
+        'abcdefghijk,MPREb_first,canonical01',
+        'lmnopqrstuv,MPREb_first,canonical02',
+      ].join('\n'));
+    }
+    assert.equal(JSON.parse(options.body).browseId, 'MPREb_first');
+    return Response.json({
+      musicResponsiveListItemRenderer: {
+        overlay: { watchEndpoint: { videoId: 'canonical01' } },
+        flexColumns: [{ text: { runs: [{ text: '100만회 재생' }] } }],
+      },
+    });
+  };
+
+  const result = await fetchYtmusicCounts({
+    spreadsheetId: 'sheet-id',
+    sheets: { links: 'Links' },
+  }, fetchImpl, new Date('2026-07-31T00:00:00Z'));
+
+  assert.deepEqual(result, {
+    counts: { abcdefghijk: 1_000_000 },
+    missing: ['lmnopqrstuv'],
+  });
+});
+
+test('YouTube Music API responds 200 with counts and missing IDs', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).includes('docs.google.com')) {
+      return new Response([
+        'video_id,album_id,ytmusic_video_id',
+        'abcdefghijk,MPREb_first,canonical01',
+        'lmnopqrstuv,MPREb_first,canonical02',
+      ].join('\n'));
+    }
+    assert.equal(JSON.parse(options.body).browseId, 'MPREb_first');
+    return Response.json({
+      musicResponsiveListItemRenderer: {
+        overlay: { watchEndpoint: { videoId: 'canonical01' } },
+        flexColumns: [{ text: { runs: [{ text: '100만회 재생' }] } }],
+      },
+    });
+  };
+
+  try {
+    const { GET } = await import('../api/ytmusic.mjs?partial-result-test');
+    const response = await GET();
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(body.counts, { abcdefghijk: 1_000_000 });
+    assert.deepEqual(body.missing, ['lmnopqrstuv']);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

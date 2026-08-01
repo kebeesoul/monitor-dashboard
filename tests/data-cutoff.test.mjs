@@ -66,6 +66,35 @@ test('source dates define the range without a hardcoded cutoff', () => {
       7: { increase: 10, observedDays: 1 },
       30: { increase: 10, observedDays: 1 },
     },
+    trend: {
+      1: {
+        available: false,
+        currentIncrease: null,
+        previousIncrease: null,
+        changePercent: null,
+        requiredPoints: 3,
+        observedPoints: 2,
+        reason: 'insufficient_data',
+      },
+      7: {
+        available: false,
+        currentIncrease: null,
+        previousIncrease: null,
+        changePercent: null,
+        requiredPoints: 15,
+        observedPoints: 2,
+        reason: 'insufficient_data',
+      },
+      30: {
+        available: false,
+        currentIncrease: null,
+        previousIncrease: null,
+        changePercent: null,
+        requiredPoints: 61,
+        observedPoints: 2,
+        reason: 'insufficient_data',
+      },
+    },
     alerts: ['new'],
   });
 });
@@ -354,8 +383,11 @@ test('public dashboard labels total and Art Track values together', () => {
 
   assert.match(html, /현재 조회수 전체 \(Art Track\)/);
   assert.match(html, /최근 \$\{tableWindow\}일 증가 전체 \(Art Track\)/);
+  assert.match(html, /최근 \$\{tableWindow\}일 증가 추세 전체 \(Art Track\)/);
   assert.match(html, /v\.currentTotalViews/);
   assert.match(html, /monitoring\.totalGrowth/);
+  assert.match(html, /monitoring\.totalTrend/);
+  assert.match(html, /비교 데이터 부족/);
   assert.match(html, /앨범 화면 표시 단위 기준/);
   assert.match(html, /video_fallback|앨범 집계 미제공/);
   assert.match(html, /Art Track/);
@@ -394,6 +426,74 @@ test('a video behind the global latest date is marked missing', () => {
   assert.deepEqual(missing.monitoring.growth[1], { increase: 0, observedDays: 0 });
   assert.ok(missing.monitoring.alerts.includes('missing'));
   assert.ok(missing.monitoring.alerts.includes('new'));
+});
+
+test('growth trend compares the latest window with the immediately previous window', () => {
+  const video = buildFromDeltas([
+    0,
+    10, 10, 10, 10, 10, 10, 10,
+    11, 11, 11, 11, 11, 11, 11,
+  ]).videos[0];
+
+  assert.deepEqual(video.monitoring.trend[7], {
+    available: true,
+    currentIncrease: 77,
+    previousIncrease: 70,
+    changePercent: 10,
+    requiredPoints: 15,
+    observedPoints: 15,
+    reason: null,
+  });
+  assert.equal(video.monitoring.trend[1].changePercent, 0);
+  assert.deepEqual(video.monitoring.trend[30], {
+    available: false,
+    currentIncrease: null,
+    previousIncrease: null,
+    changePercent: null,
+    requiredPoints: 61,
+    observedPoints: 15,
+    reason: 'insufficient_data',
+  });
+});
+
+test('growth trend requires complete consecutive calendar snapshots', () => {
+  const daily = dailyRowsFromDeltas([
+    0,
+    10, 10, 10, 10, 10, 10, 10,
+    11, 11, 11, 11, 11, 11, 11,
+  ]).filter(row => row[0] !== '2026-07-08');
+  const result = buildDashboardData([
+    ['date', 'artist', 'video_id', 'delta', 'views'],
+    ...daily,
+  ], LINKS);
+
+  assert.deepEqual(result.videos[0].monitoring.trend[7], {
+    available: false,
+    currentIncrease: null,
+    previousIncrease: null,
+    changePercent: null,
+    requiredPoints: 15,
+    observedPoints: 14,
+    reason: 'insufficient_data',
+  });
+});
+
+test('a missing latest total is not replaced by a stale total', () => {
+  const result = buildDashboardData([
+    ['date', 'artist', 'video_id', 'delta', 'views', 'increase-rate', '요일', 'total_delta', 'total_views', 'total_increase-rate'],
+    ['2026-07-31', 'Track', 'abcdefghijk', '0', '100', '0', '금', '0', '200', '0'],
+    ['2026-08-01', 'Track', 'abcdefghijk', '10', '110', '0.1', '토', '20', '220', '0.1'],
+    ['2026-08-02', 'Track', 'abcdefghijk', '10', '120', '0.09', '일', '', '', ''],
+  ], [
+    ['', 'video_id', 'artist', 'title', 'upload_date', 'mv_video_id', 'album_id'],
+    ['', 'abcdefghijk', 'Artist', 'Listed title', '2020-01-02', '', 'MPREb_test123'],
+  ]);
+  const video = result.videos[0];
+
+  assert.equal(video.currentTotalViews, undefined);
+  assert.equal(video.currentViews, 120);
+  assert.equal(video.monitoring.totalTrend[1].available, false);
+  assert.equal(video.monitoring.totalTrend[1].observedPoints, 2);
 });
 
 test('new videos defer spike, acceleration, and deceleration until enough points exist', () => {

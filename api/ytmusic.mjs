@@ -5,13 +5,14 @@ const CACHE_HEADER = 'public, s-maxage=300, stale-while-revalidate=3600, stale-i
 
 export async function GET() {
   try {
-    const counts = await fetchYtmusicCounts(config);
+    const { counts, missing } = await fetchYtmusicCounts(config);
     return Response.json(
       {
         fetchedAt: new Date().toISOString(),
         source: 'youtube_music_album_display',
         precision: 'display_unit',
         counts,
+        missing,
       },
       { headers: { 'Cache-Control': CACHE_HEADER } },
     );
