@@ -57,6 +57,19 @@ header {
 .kpi .k-value { font-size: 24px; font-weight: 600; letter-spacing: -0.28px; line-height: 1.14; margin: 3px 0 2px; word-break: keep-all; }
 .kpi .k-value.small { font-size: 16px; line-height: 1.25; }
 .kpi .k-sub { font-size: 12px; color: var(--ink-3); }
+.date-controls { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.date-controls time { flex: 1; text-align: center; font-variant-numeric: tabular-nums; }
+.date-nav {
+  width: 44px; height: 44px; flex: none; border: none; border-radius: 50%;
+  background: var(--bg); color: var(--ink-2); font: 600 18px/1 var(--font); cursor: pointer;
+}
+.date-nav:hover:not(:disabled) { background: #ededf2; }
+.date-nav:disabled { color: var(--ink-3); cursor: default; }
+.date-nav:focus-visible, .date-latest:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.date-latest {
+  border: 1px solid var(--accent); border-radius: 980px; background: transparent; color: var(--link);
+  padding: 4px 10px; font: 12px/1.33 var(--font); cursor: pointer;
+}
 .dir-up { color: var(--up); }
 .dir-down { color: var(--down); }
 .dir-flat { color: var(--ink-3); }
@@ -217,7 +230,7 @@ footer { margin-top: 14px; font-size: 11px; color: var(--ink-3); text-align: cen
             <th data-sort="views" tabindex="0" title="전체 = YouTube Music 앨범/릴리스 화면의 곡별 표시 재생수">현재 조회수 전체 (Art Track)</th>
             <th id="growth-col" data-sort="gain" tabindex="0">최근 1일 증가 전체 (Art Track)</th>
             <th id="trend-col" data-sort="rate" tabindex="0">최근 1일 증가 추세 전체 (Art Track)</th>
-            <th style="cursor:default">추세 (30일)</th>
+            <th style="cursor:default">전체 추세 (30일)</th>
             <th data-sort="points" tabindex="0">수집기간</th>
             <th class="left" style="cursor:default">상태</th>
           </tr>
@@ -249,7 +262,7 @@ footer { margin-top: 14px; font-size: 11px; color: var(--ink-3); text-align: cen
   <div class="main-grid">
     <div class="panel">
       <div class="chart-head">
-        <h2>조회수 추세 <span style="font-weight:400;color:var(--ink-3);font-size:12px">Art Track 기준</span></h2>
+        <h2>조회수 전체 추세 <span style="font-weight:400;color:var(--ink-3);font-size:12px">전체 조회수 기준</span></h2>
         <div class="seg" id="seg-period">
           <button data-p="7" class="on" aria-pressed="true">7일</button>
           <button data-p="30" aria-pressed="false">30일</button>
@@ -266,7 +279,7 @@ footer { margin-top: 14px; font-size: 11px; color: var(--ink-3); text-align: cen
       </div>
       <div class="legend" id="legend"></div>
       <div id="chart-box">
-        <svg id="chart" height="360" role="img" aria-label="선택된 영상의 조회수 추세 차트"></svg>
+        <svg id="chart" height="360" role="img" aria-label="선택된 음원의 전체 조회수 추세 차트"></svg>
         <div id="tooltip"></div>
       </div>
     </div>
@@ -349,6 +362,117 @@ function windowSum(hist, endDate, days) {
   let sum = 0;
   for (const p of hist) if (p.date >= from && p.date <= endDate) sum += p.delta;
   return sum;
+}
+
+function shiftDate(date, days) {
+  return new Date(new Date(`${date}T00:00:00Z`).getTime() + days * 86400000).toISOString().slice(0, 10);
+}
+
+function growthFor(history, endDate, days) {
+  const startDate = shiftDate(endDate, -(days - 1));
+  let increase = 0;
+  let observedDays = 0;
+  history.forEach((point, index) => {
+    if (point.date < startDate || point.date > endDate) return;
+    increase += point.delta;
+    if (index > 0) observedDays++;
+  });
+  return { increase, observedDays };
+}
+
+function trendFor(history, endDate, days) {
+  const requiredPoints = days * 2 + 1;
+  const startDate = shiftDate(endDate, -(days * 2));
+  const byDate = new Map(history.map(point => [point.date, point]));
+  const points = Array.from({ length: requiredPoints }, (_, index) => byDate.get(shiftDate(startDate, index)))
+    .filter(Boolean);
+  const observedPoints = points.length;
+  if (observedPoints !== requiredPoints) {
+    return { available:false, currentIncrease:null, previousIncrease:null, changePercent:null, requiredPoints, observedPoints, reason:'insufficient_data' };
+  }
+  const previousIncrease = points.slice(1, days + 1).reduce((sum, point) => sum + point.delta, 0);
+  const currentIncrease = points.slice(days + 1).reduce((sum, point) => sum + point.delta, 0);
+  if (previousIncrease <= 0) {
+    return { available:false, currentIncrease, previousIncrease, changePercent:null, requiredPoints, observedPoints, reason:'non_positive_previous' };
+  }
+  return {
+    available: true,
+    currentIncrease,
+    previousIncrease,
+    changePercent: Math.round(((currentIncrease - previousIncrease) / previousIncrease) * 10000) / 100,
+    requiredPoints,
+    observedPoints,
+    reason: null,
+  };
+}
+
+function medianOf(values) {
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+function monitoringAtDate(history, asOf) {
+  const latest = history.at(-1);
+  const growth = Object.fromEntries([1, 7, 30].map(days => [days, growthFor(history, asOf, days)]));
+  const trend = Object.fromEntries([1, 7, 30].map(days => [days, trendFor(history, asOf, days)]));
+  const alerts = [];
+  if (latest.date < asOf) alerts.push('missing');
+  if (history.length < 8) alerts.push('new');
+  if (history.length >= 8) {
+    const previousDeltas = history.slice(Math.max(1, history.length - 8), -1).map(point => point.delta);
+    const baseline = medianOf(previousDeltas);
+    if (baseline > 0 && latest.delta > 0 && latest.delta >= baseline * 2) alerts.push('spike');
+  }
+  if (history.length >= 15) {
+    const previousGrowth = growthFor(history, shiftDate(asOf, -7), 7).increase;
+    if (previousGrowth > 0) {
+      if (growth[7].increase >= previousGrowth * 1.2) alerts.push('accelerating');
+      else if (growth[7].increase <= previousGrowth * 0.8) alerts.push('decelerating');
+    }
+  }
+  return { asOf, latestRate: latest.date === asOf ? latest.rate : null, growth, trend, alerts };
+}
+
+function weekdaySummaryAtDate(videos) {
+  const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+  const buckets = weekdays.map((weekday, index) => ({ weekday, weekdayIndex:index + 1, sampleCount:0, totalDelta:0, dates:new Set() }));
+  videos.forEach(video => video.history.forEach(point => {
+    const bucket = buckets[point.weekdayIndex - 1];
+    bucket.sampleCount++;
+    bucket.totalDelta += point.delta;
+    bucket.dates.add(point.date);
+  }));
+  return buckets.map(({ dates, ...bucket }) => ({
+    ...bucket,
+    averageDelta: dates.size ? Math.round(bucket.totalDelta / dates.size) : 0,
+  }));
+}
+
+function dashboardAtDate(source, date) {
+  if (!source.videos.some(video => video.history.some(point => point.date === date))) return null;
+  const videos = source.videos.map(video => {
+    const history = video.history.filter(point => point.date <= date);
+    if (!history.length) return null;
+    const projected = { ...video, history, currentViews:history.at(-1).views, monitoring:monitoringAtDate(history, date) };
+    delete projected.currentTotalViews;
+    const totalHistory = history.filter(point => Number.isFinite(point.totalViews))
+      .map(point => ({ date:point.date, delta:point.totalDelta, rate:point.totalRate }));
+    if (totalHistory.length) {
+      const currentTotal = history.find(point => point.date === date && Number.isFinite(point.totalViews));
+      if (currentTotal) projected.currentTotalViews = currentTotal.totalViews;
+      projected.monitoring.latestTotalRate = totalHistory.at(-1).date === date ? totalHistory.at(-1).rate : null;
+      projected.monitoring.totalGrowth = Object.fromEntries([1, 7, 30].map(days => [days, growthFor(totalHistory, date, days)]));
+      projected.monitoring.totalTrend = Object.fromEntries([1, 7, 30].map(days => [days, trendFor(totalHistory, date, days)]));
+    }
+    return projected;
+  }).filter(Boolean);
+  return {
+    ...source,
+    dateRange: { start:source.dateRange.start, end:date },
+    weekdaySummary: weekdaySummaryAtDate(videos),
+    videos,
+  };
 }
 
 /* ═══════════════ SVG 차트 렌더러 ═══════════════ */
@@ -458,19 +582,22 @@ function attachTooltip(box, svg, series, geo, valueLabel) {
 }
 
 function sparkline(hist, w, h) {
-  const pts = hist.slice(-30);
-  if (pts.length < 2) return `<svg class="spark" width="${w}" height="${h}"><circle cx="${w/2}" cy="${h/2}" r="2" fill="var(--accent)"/></svg>`;
+  const pts = hist.filter(point => Number.isFinite(point.totalViews)).slice(-30);
+  if (!pts.length) return '<span style="color:var(--ink-3)">—</span>';
+  if (pts.length === 1) return `<svg class="spark" width="${w}" height="${h}"><circle cx="${w/2}" cy="${h/2}" r="2" fill="var(--accent)"/></svg>`;
   let mn = Infinity, mx = -Infinity;
-  for (const p of pts) { mn = Math.min(mn, p.views); mx = Math.max(mx, p.views); }
+  for (const p of pts) { mn = Math.min(mn, p.totalViews); mx = Math.max(mx, p.totalViews); }
   if (mn === mx) mx = mn + 1;
   const d = pts.map((p, i) =>
-    `${i ? 'L' : 'M'}${(i/(pts.length-1)*(w-4)+2).toFixed(1)},${((1-(p.views-mn)/(mx-mn))*(h-6)+3).toFixed(1)}`
+    `${i ? 'L' : 'M'}${(i/(pts.length-1)*(w-4)+2).toFixed(1)},${((1-(p.totalViews-mn)/(mx-mn))*(h-6)+3).toFixed(1)}`
   ).join('');
   return `<svg class="spark" width="${w}" height="${h}"><path d="${d}"/></svg>`;
 }
 
 /* ═══════════════ 상태 ═══════════════ */
+let FULL_DATA = null;
 let DATA = null;
+let selectedDate = null;
 let selectedIds = [];       // 차트에 표시 중인 영상들
 let highlightId = null;     // 하이라이트/드릴다운 대상
 let period = '7';
@@ -525,8 +652,28 @@ function renderKPIs() {
     <div class="kpi"><div class="k-label">최고 성장 영상 (7일)</div>
       <div class="k-value small" title="${esc(topLabel)}">${esc(topLabel)}</div>
       <div class="k-sub">+${fmt(topD7)} · ${dirHtml(topPct)}</div></div>
-    <div class="kpi"><div class="k-label">최신 스크랩 날짜</div>
-      <div class="k-value small">${end}</div></div>`;
+    <div class="kpi">${dateControlHtml()}</div>`;
+  bindDateControls();
+}
+
+function dateControlHtml() {
+  const latest = FULL_DATA.dateRange.end;
+  const earliest = FULL_DATA.dateRange.start;
+  const isLatest = selectedDate === latest;
+  return `<div class="k-label">${isLatest ? '최신 스크랩 날짜' : '기준 스크랩 날짜'}</div>
+    <div class="date-controls" aria-label="스크랩 기준일 이동">
+      <button class="date-nav" type="button" data-date-shift="-1" aria-label="이전 날짜"${selectedDate <= earliest ? ' disabled' : ''}>‹</button>
+      <time class="k-value small" datetime="${selectedDate}" aria-live="polite">${selectedDate}</time>
+      <button class="date-nav" type="button" data-date-shift="1" aria-label="다음 날짜"${isLatest ? ' disabled' : ''}>›</button>
+    </div>
+    ${isLatest ? '' : '<button class="date-latest" type="button" data-date-latest>최신으로 이동</button>'}`;
+}
+
+function bindDateControls() {
+  document.querySelectorAll('[data-date-shift]').forEach(button => {
+    button.onclick = () => applySelectedDate(shiftDate(selectedDate, Number(button.dataset.dateShift)));
+  });
+  document.querySelector('[data-date-latest]')?.addEventListener('click', () => applySelectedDate(FULL_DATA.dateRange.end));
 }
 
 function periodStart() {
@@ -540,9 +687,9 @@ function renderChart() {
   const series = selectedIds.map((id, i) => {
     const v = DATA.videos.find(x => x.id === id);
     if (!v) return null;
-    let pts = v.history.filter(p => p.date >= from);
-    if (viewMode === 'delta') pts = pts.map(p => ({ date: p.date, value: p.delta }));
-    else pts = pts.map(p => ({ date: p.date, value: p.views }));
+    let pts = v.history.filter(p => p.date >= from && Number.isFinite(p.totalViews));
+    if (viewMode === 'delta') pts = pts.map(p => ({ date: p.date, value: p.totalDelta }));
+    else pts = pts.map(p => ({ date: p.date, value: p.totalViews }));
     return { id, name: v.title, color: PALETTE[i % PALETTE.length], points: pts };
   }).filter(Boolean);
 
@@ -848,12 +995,69 @@ function setTableFilter(status, shouldRender = true) {
   tableFilter = status;
   const button = $(`#seg-status [data-status="${status}"]`);
   activateSegment($('#seg-status'), button);
-  if (shouldRender) renderTable();
+  if (shouldRender && DATA) renderTable();
+}
+
+function renderDashboard() {
+  renderKPIs(); renderChart(); renderTable(); renderWeekdayTable(); renderDrill();
+}
+
+function renderEmptyDate() {
+  $('#kpi-row').innerHTML = `
+    <div class="kpi"><div class="k-label">추적 영상 수</div><div class="k-value">—</div></div>
+    <div class="kpi"><div class="k-label">최근 7일 총 증가량</div><div class="k-value">—</div></div>
+    <div class="kpi"><div class="k-label">최고 성장 영상 (7일)</div><div class="k-value small">—</div></div>
+    <div class="kpi">${dateControlHtml()}</div>`;
+  bindDateControls();
+  $('#tbl-count').textContent = `${selectedDate} 수집 데이터가 없습니다`;
+  document.querySelectorAll('[data-filter-count]').forEach(element => { element.textContent = '0'; });
+  $('#tbl-body').innerHTML = '<tr class="table-empty"><td colspan="10">해당 날짜에 수집 데이터가 없습니다</td></tr>';
+  $('#weekday-body').innerHTML = ['월', '화', '수', '목', '금', '토', '일'].map(weekday => `
+    <tr><td class="left">${weekday}</td><td>—</td><td>—</td><td>—</td></tr>`).join('');
+  $('#legend').innerHTML = '';
+  $('#tooltip').style.display = 'none';
+  renderLineChart($('#chart'), [], { zeroBase:viewMode === 'delta' });
+  $('#drill').innerHTML = '<div class="d-empty">해당 날짜에 수집 데이터가 없습니다.</div>';
+}
+
+function updateDateUrl() {
+  if (!['http:', 'https:'].includes(window.location.protocol)) return;
+  const url = new URL(window.location.href);
+  if (selectedDate === FULL_DATA.dateRange.end) url.searchParams.delete('date');
+  else url.searchParams.set('date', selectedDate);
+  window.history.replaceState(null, '', url);
+}
+
+function initialSelectedDate() {
+  const requested = new URLSearchParams(window.location.search).get('date');
+  return /^\d{4}-\d{2}-\d{2}$/.test(requested || '')
+    && requested >= FULL_DATA.dateRange.start
+    && requested <= FULL_DATA.dateRange.end
+    ? requested
+    : FULL_DATA.dateRange.end;
+}
+
+function applySelectedDate(date, shouldUpdateUrl = true) {
+  selectedDate = date < FULL_DATA.dateRange.start
+    ? FULL_DATA.dateRange.start
+    : date > FULL_DATA.dateRange.end
+      ? FULL_DATA.dateRange.end
+      : date;
+  DATA = dashboardAtDate(FULL_DATA, selectedDate);
+  if (shouldUpdateUrl) updateDateUrl();
+  if (!DATA) {
+    renderEmptyDate();
+    return;
+  }
+  const availableIds = new Set(DATA.videos.map(video => video.id));
+  selectedIds = selectedIds.filter(id => availableIds.has(id));
+  if (highlightId && !availableIds.has(highlightId)) highlightId = null;
+  renderDashboard();
 }
 
 function init() {
-  const gen = DATA.generatedAt
-    ? new Date(DATA.generatedAt).toLocaleString('sv-SE', { hour12: false }).slice(0, 16)
+  const gen = FULL_DATA.generatedAt
+    ? new Date(FULL_DATA.generatedAt).toLocaleString('sv-SE', { hour12: false }).slice(0, 16)
     : '-';
   const srcLabel = {
     api: '🟢 라이브 API',
@@ -861,27 +1065,32 @@ function init() {
     embedded: '📦 내장 스냅샷',
     local: '💾 로컬 스냅샷',
   }[dataSource];
-  $('#hd-meta').textContent = `${srcLabel} · 갱신 ${gen} · 기간 ${DATA.dateRange.start} ~ ${DATA.dateRange.end}`;
+  $('#hd-meta').textContent = `${srcLabel} · 갱신 ${gen} · 기간 ${FULL_DATA.dateRange.start} ~ ${FULL_DATA.dateRange.end}`;
   $('#foot').textContent = 'BNM Youtube 아트트랙 모니터링';
 
-  renderKPIs(); renderChart(); renderTable(); renderWeekdayTable(); renderDrill();
+  selectedDate = initialSelectedDate();
+  applySelectedDate(selectedDate, false);
 
   $('#seg-period').querySelectorAll('button').forEach(b => b.onclick = () => {
     activateSegment($('#seg-period'), b);
-    period = b.dataset.p; renderChart();
+    period = b.dataset.p;
+    if (DATA) renderChart();
   });
   $('#seg-view').querySelectorAll('button').forEach(b => b.onclick = () => {
     activateSegment($('#seg-view'), b);
-    viewMode = b.dataset.v; renderChart();
+    viewMode = b.dataset.v;
+    if (DATA) renderChart();
   });
   $('#seg-num').querySelectorAll('button').forEach(b => b.onclick = () => {
     activateSegment($('#seg-num'), b);
-    numMode = b.dataset.n; renderKPIs(); renderTable(); renderWeekdayTable(); renderDrill();
+    numMode = b.dataset.n;
+    if (DATA) renderDashboard();
+    else renderEmptyDate();
   });
   $('#seg-growth').querySelectorAll('button').forEach(b => b.onclick = () => {
     activateSegment($('#seg-growth'), b);
     tableWindow = Number(b.dataset.w);
-    renderTable();
+    if (DATA) renderTable();
   });
   $('#seg-status').querySelectorAll('button').forEach(b => b.onclick = () => {
     setTableFilter(b.dataset.status);
@@ -894,7 +1103,7 @@ function init() {
         sortKey = k;
         sortDir = ['artist', 'title', 'uploadDate'].includes(k) ? 1 : -1;
       }
-      renderTable();
+      if (DATA) renderTable();
     };
     th.onkeydown = event => {
       if (event.key === 'Enter' || event.key === ' ') {
@@ -911,7 +1120,7 @@ function init() {
         weekdaySortKey = key;
         weekdaySortDir = key === 'weekdayIndex' ? 1 : -1;
       }
-      renderWeekdayTable();
+      if (DATA) renderWeekdayTable();
     };
     th.onkeydown = event => {
       if (event.key === 'Enter' || event.key === ' ') {
@@ -920,10 +1129,10 @@ function init() {
       }
     };
   });
-  window.addEventListener('resize', renderChart);
+  window.addEventListener('resize', () => { if (DATA) renderChart(); });
 }
 
-loadData().then(d => { DATA = d; init(); })
+loadData().then(d => { FULL_DATA = d; init(); })
   .catch(e => {
     console.error(e);
     $('#hd-meta').textContent = '데이터 로드 실패 — ' + e.message;

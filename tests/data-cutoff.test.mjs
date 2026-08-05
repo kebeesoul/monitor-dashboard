@@ -355,7 +355,8 @@ test('public and standalone HTML use the performance table for monitoring', () =
     assert.match(html, /title="\$\{esc\(topLabel\)\}">\$\{esc\(topLabel\)\}<\/div>/);
     assert.match(html, /\$\{esc\(v\.artist\)\} - \$\{esc\(v\.title\)\} ↗<\/a>/);
     assert.match(html, />발매일 \$\{v\.uploadDate\} · \$\{v\.totalSource/);
-    assert.match(html, /<div class="k-label">최신 스크랩 날짜<\/div>/);
+    assert.match(html, /최신 스크랩 날짜/);
+    assert.match(html, /기준 스크랩 날짜/);
     assert.doesNotMatch(html, /<div class="k-sub">데이터 [\s\S]*?포인트<\/div>/);
     assert.match(html, /데이터 포인트가 1개뿐이라 추세를 계산할 수 없습니다/);
     assert.doesNotMatch(html, /id="id-input"|id="id-btn"|id="id-msg"|lookupId|extractVideoId|DATA\.videos\.slice\(0, 5\)/);
@@ -391,6 +392,28 @@ test('public dashboard labels total and Art Track values together', () => {
   assert.match(html, /앨범 화면 표시 단위 기준/);
   assert.match(html, /video_fallback|앨범 집계 미제공/);
   assert.match(html, /Art Track/);
+});
+
+test('dashboard date navigation and main trend use total metrics', () => {
+  for (const filename of ['index.html', 'index_standalone.html']) {
+    const html = readFileSync(join(ROOT, filename), 'utf8');
+    const chartSource = html.slice(
+      html.indexOf('function renderChart()'),
+      html.indexOf('function toggleSeries('),
+    );
+
+    assert.match(html, /data-date-shift="-1"/);
+    assert.match(html, /data-date-shift="1"/);
+    assert.match(html, /data-date-latest/);
+    assert.match(html, /function dashboardAtDate\(source, date\)/);
+    assert.match(html, /function applySelectedDate\(date, shouldUpdateUrl = true\)/);
+    assert.match(html, /수집 데이터가 없습니다/);
+    assert.match(html, /조회수 전체 추세/);
+    assert.match(chartSource, /value: p\.totalDelta/);
+    assert.match(chartSource, /value: p\.totalViews/);
+    assert.doesNotMatch(chartSource, /value: p\.delta|value: p\.views/);
+    assert.match(html, /function sparkline\(hist, w, h\)[\s\S]*p\.totalViews/);
+  }
 });
 
 test('latest daily rates and 1, 7, 30 day gains are available for every listed video', () => {
